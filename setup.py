@@ -17,6 +17,9 @@ setup(
     author_email = 'zeionara@gmail.com',
     url = 'https://github.com/zeionara/raconteur',
     keywords = ['speech', 'synthesis'],
+    install_requires = [
+        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy', 'git+https://github.com/suno-ai/bark.git'
+    ],
     classifiers = [
         'Programming Language :: Python :: 3.11'
     ]
