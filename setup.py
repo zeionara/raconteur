@@ -9,7 +9,7 @@ def get_readme():
 setup(
     name = 'raconteur',
     packages = ['rr'],
-    version = '0.2',
+    version = '0.3',
     license = 'Apache 2.0',
     description = 'An auxiliary app for simplifying speech synthesis on arbitrary texts',
     long_description = get_readme(),
@@ -18,7 +18,7 @@ setup(
     url = 'https://github.com/zeionara/raconteur',
     keywords = ['speech', 'synthesis'],
     install_requires = [
-        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy'
+        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy', 'bark @ git+https://github.com/suno-ai/bark.git'
     ],
     classifiers = [
         'Programming Language :: Python :: 3.11'
