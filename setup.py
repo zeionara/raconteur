@@ -9,7 +9,7 @@ def get_readme():
 setup(
     name = 'raconteur',
     packages = ['rr'],
-    version = '0.1',
+    version = '0.2',
     license = 'Apache 2.0',
     description = 'An auxiliary app for simplifying speech synthesis on arbitrary texts',
     long_description = get_readme(),
@@ -17,6 +17,9 @@ setup(
     author_email = 'zeionara@gmail.com',
     url = 'https://github.com/zeionara/raconteur',
     keywords = ['speech', 'synthesis'],
+    install_requires = [
+        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy'
+    ],
     classifiers = [
         'Programming Language :: Python :: 3.11'
     ]
