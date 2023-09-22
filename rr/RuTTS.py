@@ -40,7 +40,7 @@ class RuTTS(Raconteur):
 
         while (match := NUMBER_PATTERN.search(text)) is not None:
             number = match.group(0)
-            text = text.replace(number, num2words(number, lang = 'ru'))
+            text = text.replace(number, num2words(number, lang = 'ru'), 1)
 
         return self.tts(
             self.accentizer.process_all(text),
