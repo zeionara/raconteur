@@ -1,5 +1,6 @@
 from RUTTS import TTS
 from ruaccent import RUAccent
+from transliterate import translit
 
 from .Raconteur import Raconteur
 
@@ -26,7 +27,9 @@ class RuTTS(Raconteur):
 
     def predict(self, text):
         return self.tts(
-            self.accentizer.process_all(text),
+            self.accentizer.process_all(
+                translit(text, 'ru')
+            ),
             lenght_scale = self.length_scale
         )
 
