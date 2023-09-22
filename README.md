@@ -10,6 +10,12 @@ To create a `conda` environment with required dependencies run the following com
 conda env create -f environment.yml
 ```
 
+Install the following dependencies manually:
+
+```sh
+sudo apt-get install libportaudio2
+```
+
 ## Testing
 
 To run tests use the following statement:
