@@ -1,12 +1,17 @@
+import re
+
 from RUTTS import TTS
 from ruaccent import RUAccent
 from transliterate import translit
+from num2words import num2words
 
 from .Raconteur import Raconteur
 
 
 RUTTS_MODEL_PATH = './assets/rutts'
 ACCENTIZER_MODEL_PATH = './assets/accentizer'
+
+NUMBER_PATTERN = re.compile('[-+]?[0-9]+')
 
 
 class RuTTS(Raconteur):
@@ -26,10 +31,19 @@ class RuTTS(Raconteur):
         return 22050
 
     def predict(self, text):
+
+        # Transliterate
+
+        text = translit(text, 'ru')
+
+        # Replace numbers with words
+
+        while (match := NUMBER_PATTERN.search(text)) is not None:
+            number = match.group(0)
+            text = text.replace(number, num2words(number, lang = 'ru'))
+
         return self.tts(
-            self.accentizer.process_all(
-                translit(text, 'ru')
-            ),
+            self.accentizer.process_all(text),
             lenght_scale = self.length_scale
         )
 
