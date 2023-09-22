@@ -18,7 +18,9 @@ setup(
     url = 'https://github.com/zeionara/raconteur',
     keywords = ['speech', 'synthesis'],
     install_requires = [
-        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy', 'suno-bark @ git+https://github.com/suno-ai/bark.git'
+        'ipython', 'scipy', 'pydub', 'music-tag', 'numpy',
+        'suno-bark @ git+https://github.com/suno-ai/bark.git',
+        'RUTTS @ git+https://github.com/zeionara/RUTTS'
     ],
     classifiers = [
         'Programming Language :: Python :: 3.11'
