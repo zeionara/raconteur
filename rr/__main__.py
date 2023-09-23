@@ -1,15 +1,16 @@
-from os import path, makedirs, environ as env
+from os import path, makedirs
 from time import time
 
 from click import group, argument, option, Choice
 from pandas import read_csv
 
-from .Splitter import Splitter
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 
 from .RaconteurFactory import RaconteurFactory
+
+from .util import one_is_not_none, read
 
 
 ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name), case_sensitive = False)
@@ -21,13 +22,18 @@ def main():
 
 
 @main.command()
-@argument('text', type = str)
+@argument('text', type = str, required = False)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
 @option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool):
+@option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str):
+    match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
+        case 1:
+            text = read(txt)
+
     RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination)
 
 
