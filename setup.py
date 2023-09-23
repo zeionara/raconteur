@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def get_readme():
@@ -8,7 +8,7 @@ def get_readme():
 
 setup(
     name = 'raconteur',
-    packages = ['rr'],
+    packages = find_packages(),
     version = '0.4',
     license = 'Apache 2.0',
     description = 'An auxiliary app for simplifying speech synthesis on arbitrary texts',
