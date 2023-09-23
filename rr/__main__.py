@@ -7,13 +7,14 @@ from pandas import read_csv
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
+from .Crt import Crt
 
 from .RaconteurFactory import RaconteurFactory
 
 from .util import one_is_not_none, read
 
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name), case_sensitive = False)
+ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name), case_sensitive = False)
 
 
 @group()
@@ -35,6 +36,7 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
             text = read(txt)
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination)
+    # RaconteurFactory(gpu, russian).make('crt', max_n_characters).predict(text)
 
 
 @main.command()

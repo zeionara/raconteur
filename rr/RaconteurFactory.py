@@ -5,6 +5,7 @@ from .Splitter import Splitter
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
+from .Crt import Crt
 
 
 class RaconteurFactory:
@@ -34,6 +35,14 @@ class RaconteurFactory:
                     add_time_to_end = 0.1,
                     length_scale = 1.65,
                     gpu = self.gpu
+                )
+            case Crt.name:
+                return Crt(
+                    username = env['CRT_USERNAME'],
+                    password = env['CRT_PASSWORD'],
+                    domain = int(env['CRT_DOMAIN']),
+                    artist = 'Vladimir_n',
+                    splitter = Splitter(500 if max_n_characters is None else max_n_characters)
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')
