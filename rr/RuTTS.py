@@ -30,6 +30,10 @@ class RuTTS(Raconteur):
     def sample_rate(self):
         return 22050
 
+    @property
+    def dtype(self):
+        return 'float32'
+
     def predict(self, text):
 
         # Transliterate

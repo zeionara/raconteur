@@ -12,6 +12,10 @@ class Bark(Raconteur):
     def sample_rate(self):
         return SAMPLE_RATE
 
+    @property
+    def dtype(self):
+        return 'float32'
+
     def predict(self, text):
         return generate_audio(text, history_prompt = self.artist)
 

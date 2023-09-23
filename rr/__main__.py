@@ -1,4 +1,4 @@
-from os import path, makedirs
+from os import path, makedirs, environ as env
 from time import time
 
 from click import group, argument, option
@@ -6,6 +6,7 @@ from pandas import read_csv
 
 from .Splitter import Splitter
 from .RuTTS import RuTTS
+from .SaluteSpeech import SaluteSpeech
 
 
 @group()
@@ -18,6 +19,14 @@ def main():
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 def say(text: str, max_n_characters: int, gpu: bool):
+    SaluteSpeech(
+        client_id = env['SALUTE_SPEECH_CLIENT_ID'],
+        client_secret = env['SALUTE_SPEECH_CLIENT_SECRET'],
+        auth = env['SALUTE_SPEECH_AUTH'],
+        splitter = Splitter()
+    ).speak(text, filename = 'assets/speech.mp3')
+
+    # print(speaker.speak(text, filename = 'audio.mp3'))
 
     # tts = TTS("TeraTTS/natasha-g2p-vits", add_time_to_end=0.8)
     # # tts = TTS('TeraTTS/natasha-g2p-vits', add_time_to_end = 0.8)
@@ -37,7 +46,7 @@ def say(text: str, max_n_characters: int, gpu: bool):
     # # print(text)
 
     # Bark(artist = 'v2/ru_speaker_6', splitter = Splitter(max_n_characters)).speak(text, filename = 'assets/speech.mp3')
-    RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu).speak(text, filename = 'assets/speech.mp3')
+    # RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu).speak(text, filename = 'assets/speech.mp3')
 
     # splitter = Splitter(max_n_characters)
 

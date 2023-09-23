@@ -41,6 +41,11 @@ class Raconteur(ABC):
     def sample_rate(self):
         pass
 
+    @property
+    @abstractmethod
+    def dtype(self):
+        pass
+
     @abstractmethod
     def predict(self, text):
         pass
@@ -49,7 +54,7 @@ class Raconteur(ABC):
         pass
 
     def _say(self, text: str):
-        combined = np.array([], dtype = 'float32')
+        combined = np.array([], dtype = self.dtype)
 
         for chunk in self.splitter.split(text):
             combined = np.concatenate((combined, self.predict(chunk)))

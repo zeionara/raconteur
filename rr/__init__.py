@@ -3,3 +3,4 @@ from .Bark import Bark
 
 from .Raconteur import Raconteur
 from .RuTTS import RuTTS
+from .SaluteSpeech import SaluteSpeech
