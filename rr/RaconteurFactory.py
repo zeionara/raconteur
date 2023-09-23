@@ -6,6 +6,7 @@ from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
+from .Coqui import Coqui
 
 
 class RaconteurFactory:
@@ -43,6 +44,13 @@ class RaconteurFactory:
                     domain = int(env['CRT_DOMAIN']),
                     artist = 'Vladimir_n',
                     splitter = Splitter(500 if max_n_characters is None else max_n_characters)
+                )
+            case Coqui.name:
+                return Coqui(
+                    speaker_wav = 'assets/female.wav',
+                    gpu = self.gpu,
+                    ru = self.ru,
+                    splitter = Splitter(200 if max_n_characters is None else max_n_characters)
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')

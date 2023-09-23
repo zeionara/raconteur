@@ -4,17 +4,20 @@ from time import time
 from click import group, argument, option, Choice
 from pandas import read_csv
 
+from TTS.api import TTS
+
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
+from .Coqui import Coqui
 
 from .RaconteurFactory import RaconteurFactory
 
 from .util import one_is_not_none, read
 
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name), case_sensitive = False)
+ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name), case_sensitive = False)
 
 
 @group()
@@ -34,6 +37,21 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
+
+    # tts = TTS('tts_models/multilingual/multi-dataset/xtts_v1').to('cuda' if gpu else 'cpu')
+
+    # print(tts.tts(
+    #     text = text,
+    #     speaker_wav = 'assets/female.wav',
+    #     language = 'en'
+    # ))
+
+    # tts.tts_to_file(
+    #     text = text,
+    #     file_path = 'audio.wav',
+    #     speaker_wav = 'assets/female.wav',
+    #     language = 'en'
+    # )
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination)
     # RaconteurFactory(gpu, russian).make('crt', max_n_characters).predict(text)
