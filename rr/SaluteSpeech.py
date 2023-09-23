@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import datetime
 from io import BytesIO
 
-from scipy.io.wavfile import read as read_wav, write as write_wav
+from scipy.io.wavfile import read as read_wav
 
 from .Raconteur import Raconteur
 
@@ -15,9 +15,10 @@ TIMEOUT = 100
 
 
 class SaluteSpeech(Raconteur):
-    def __init__(self, client_id: str, client_secret: str, auth: str, artist = 'Nec', *args, **kwargs):
-        self.client_id = client_id
-        self.client_secret = client_secret
+    # def __init__(self, client_id: str, client_secret: str, auth: str, artist = 'Nec', *args, **kwargs):
+    def __init__(self, auth: str, artist = 'Nec', *args, **kwargs):
+        # self.client_id = client_id
+        # self.client_secret = client_secret
         self.auth = auth
         self.artist = artist
 

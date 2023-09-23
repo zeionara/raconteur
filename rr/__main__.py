@@ -69,7 +69,8 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
     n_aneks = 0
 
     # speaker = Bark(artist = 'v2/ru_speaker_6', splitter = Splitter(max_n_characters = 200))
-    speaker = RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu)
+    # speaker = RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu)  # max-n-characters = 1000
+    speaker = SaluteSpeech(auth = env['SALUTE_SPEECH_AUTH'], splitter = Splitter(max_n_characters))  # max-n-characters = 4000
 
     start = time()
 
