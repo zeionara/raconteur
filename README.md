@@ -2,7 +2,49 @@
 
 An auxiliary tool for simplifying speech generation on arbitrary texts
 
-## Install dependencies
+## Usage
+
+### Generate speech for any text
+
+To generate speech for an arbitrary text, use the following command:
+
+```sh
+python -m rr say 'Привет, мир'
+```
+
+By default [RuTTS toolkit][1] is used, but you can specify other model using `-e` (`--engine`) cli argument:
+
+```sh
+python -m rr say 'Привет, мир' -e bark
+```
+
+Currently the following engines are supported:
+
+1. [rutts][1] - an economical model only for russian texts;
+1. [bark][3] - multilingual model, requires a lot of gpu;
+1. [salute][4] - adapter to the cloud service from sber, requires environment variable `SALUTE_SPEECH_AUTH` to be set.
+
+For a full list of available cli options see [`__main__.py`][2].
+
+### Convert anecdotes to voice
+
+The app natively supports one specific use-case: it allows to synthesize speech for anecdotes from [this kaggle dataset](https://www.kaggle.com/datasets/zeionara/anecdotes?select=anecdotes.tsv). The command is similar to the examples listed above, to use `rutts` model for reading aloud the first 10 anecdotes you can just type:
+
+```sh
+python -m rr handle-aneks -n 10
+```
+
+Also you can use another model and specify input / output paths:
+
+```sh
+python -m rr handle-aneks -e bark -s 'assets/anecdotes.tsv' -d 'assets/anecdotes' -n 10
+```
+
+For a full list of available cli options see [`__main__.py`][2].
+
+Also, see the [exemplary jupyter notebook](./example.ipynb) which is regularly updated.
+
+## Installation
 
 To create a `conda` environment with required dependencies run the following command:
 
@@ -24,22 +66,7 @@ To run tests use the following statement:
 python -m unittest discover test
 ```
 
-## Usage
-
-The app allows to synthesize speech for anecdotes from [this kaggle dataset](https://www.kaggle.com/datasets/zeionara/anecdotes?select=anecdotes.tsv) using various speech engines. To apply [salute-speech](https://developers.sber.ru/portal/products/smartspeech) for the task update the [`__main__.py`](https://github.com/zeionara/raconteur/blob/master/rr/__main__.py) script uncommenting the corresponding line with target engine and commenting the others, then execute the following command:
-
-```sh
-python -m rr handle-aneks -d assets/salute-speech -c 4000 -n 10
-```
-
-Similarly, to use [RuTTS toolkit](https://github.com/Tera2Space/RUTTS) run the following command:
-
-```sh
-python -m rr handle-aneks -n 10 -c 1000 -g
-```
-
-To use [Bark](https://github.com/suno-ai/bark) model use the following snippet:
-
-```sh
-python -m rr handle-aneks -n 10 -c 200
-```
+[1]: https://github.com/Tera2Space/RUTTS
+[2]: https://github.com/zeionara/raconteur/blob/master/rr/__main__.py
+[3]: https://github.com/suno-ai/bark
+[4]: https://developers.sber.ru/portal/products/smartspeech

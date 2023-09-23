@@ -10,6 +10,8 @@ from .Splitter import Splitter
 
 
 class Raconteur(ABC):
+    name = None
+
     def __init__(self, splitter: Splitter, tmp_filename: str = "/tmp/audio.wav"):
         self.tmp_filename = tmp_filename
         self.splitter = splitter

@@ -4,6 +4,8 @@ from .Raconteur import Raconteur
 
 
 class Bark(Raconteur):
+    name = 'bark'
+
     def __init__(self, artist: str, *args, **kwargs):
         self.artist = artist
         super().__init__(*args, **kwargs)

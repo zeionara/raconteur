@@ -1,12 +1,18 @@
 from os import path, makedirs, environ as env
 from time import time
 
-from click import group, argument, option
+from click import group, argument, option, Choice
 from pandas import read_csv
 
 from .Splitter import Splitter
+from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
+
+from .RaconteurFactory import RaconteurFactory
+
+
+ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name), case_sensitive = False)
 
 
 @group()
@@ -18,39 +24,10 @@ def main():
 @argument('text', type = str)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-def say(text: str, max_n_characters: int, gpu: bool):
-    SaluteSpeech(
-        client_id = env['SALUTE_SPEECH_CLIENT_ID'],
-        client_secret = env['SALUTE_SPEECH_CLIENT_SECRET'],
-        auth = env['SALUTE_SPEECH_AUTH'],
-        splitter = Splitter()
-    ).speak(text, filename = 'assets/speech.mp3')
-
-    # print(speaker.speak(text, filename = 'audio.mp3'))
-
-    # tts = TTS("TeraTTS/natasha-g2p-vits", add_time_to_end=0.8)
-    # # tts = TTS('TeraTTS/natasha-g2p-vits', add_time_to_end = 0.8)
-
-    # accentizer = RUAccent(workdir = './assets/accentizer')
-
-    # accentizer.load(omograph_model_size = 'medium')
-
-    # text = accentizer.process_all(text)
-
-    # audio = tts(text, length_scale = 1.65)
-
-    # tts.save_wav(audio, './audio.wav')
-
-    # print(audio)
-
-    # # print(text)
-
-    # Bark(artist = 'v2/ru_speaker_6', splitter = Splitter(max_n_characters)).speak(text, filename = 'assets/speech.mp3')
-    # RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu).speak(text, filename = 'assets/speech.mp3')
-
-    # splitter = Splitter(max_n_characters)
-
-    # print(splitter.split(text))
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+@option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str):
+    RaconteurFactory(gpu).make(engine, max_n_characters).speak(text, filename = destination)
 
 
 @main.command()
@@ -60,7 +37,8 @@ def say(text: str, max_n_characters: int, gpu: bool):
 @option('--top-n', '-n', help = 'number of entries to handle', type = int, default = None)
 @option('--offset', '-o', help = 'number of entries in the beginning to skip', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool):
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str):
     if not path.isdir(destination):
         makedirs(destination)
 
@@ -68,9 +46,7 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
 
     n_aneks = 0
 
-    # speaker = Bark(artist = 'v2/ru_speaker_6', splitter = Splitter(max_n_characters = 200))
-    # speaker = RuTTS(splitter = Splitter(max_n_characters), add_time_to_end = 0.1, length_scale = 1.65, gpu = gpu)  # max-n-characters = 1000
-    speaker = SaluteSpeech(auth = env['SALUTE_SPEECH_AUTH'], splitter = Splitter(max_n_characters))  # max-n-characters = 4000
+    speaker = RaconteurFactory(gpu).make(engine, max_n_characters)
 
     start = time()
 

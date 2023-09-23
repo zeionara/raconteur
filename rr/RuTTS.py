@@ -15,6 +15,8 @@ NUMBER_PATTERN = re.compile('[-+]?[0-9]+')
 
 
 class RuTTS(Raconteur):
+    name = 'rutts'
+
     def __init__(self, artist: str = 'TeraTTS/natasha-g2p-vits', add_time_to_end = 0.8, length_scale = 1.2, gpu: bool = True, *args, **kwargs):
         self.add_time_to_end = add_time_to_end
         self.length_scale = length_scale

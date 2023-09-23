@@ -15,6 +15,8 @@ TIMEOUT = 100
 
 
 class SaluteSpeech(Raconteur):
+    name = 'salute'
+
     # def __init__(self, client_id: str, client_secret: str, auth: str, artist = 'Nec', *args, **kwargs):
     def __init__(self, auth: str, artist = 'Nec', *args, **kwargs):
         # self.client_id = client_id
