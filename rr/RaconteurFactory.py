@@ -24,7 +24,7 @@ class RaconteurFactory:
                 )
             case Bark.name:
                 return Bark(
-                    artist = 'v2/ru_speaker_6' if self.ru else None,
+                    artist = 'v2/ru_speaker_6' if self.ru else 'v2/en_speaker_6',
                     splitter = Splitter(200 if max_n_characters is None else max_n_characters)
                 )
             case RuTTS.name:
