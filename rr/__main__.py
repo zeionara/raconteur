@@ -26,8 +26,9 @@ def main():
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
 @option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str):
-    RaconteurFactory(gpu).make(engine, max_n_characters).speak(text, filename = destination)
+@option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool):
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination)
 
 
 @main.command()
@@ -38,7 +39,8 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 @option('--offset', '-o', help = 'number of entries in the beginning to skip', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
-def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str):
+@option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
+def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool):
     if not path.isdir(destination):
         makedirs(destination)
 
@@ -46,7 +48,7 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
 
     n_aneks = 0
 
-    speaker = RaconteurFactory(gpu).make(engine, max_n_characters)
+    speaker = RaconteurFactory(gpu, russian).make(engine, max_n_characters)
 
     start = time()
 
