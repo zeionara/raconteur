@@ -4,8 +4,6 @@ from time import time
 from click import group, argument, option, Choice
 from pandas import read_csv
 
-from TTS.api import TTS
-
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
@@ -66,7 +64,8 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
-def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool):
+@option('--skip-if-exists', '-k', help = 'skip anek if audio file with the same name already exists', is_flag = True)
+def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool, skip_if_exists: bool):
     if not path.isdir(destination):
         makedirs(destination)
 
@@ -88,11 +87,13 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
         )
     ).loc[:, ('id', 'text')].iterrows():
         text = row['text']
+        filename = path.join(destination, f'{row["id"]:08d}.mp3')
 
-        speaker.speak(
-            text = text,
-            filename = path.join(destination, f'{row["id"]:08d}.mp3')
-        )
+        if not skip_if_exists or not path.isfile(filename):
+            speaker.speak(
+                text = text,
+                filename = filename
+            )
 
         n_aneks += 1
 
