@@ -52,7 +52,7 @@ class Crt(Raconteur):
         data = response.json().get('data')
 
         if data is None:
-            raise KeyError('No "data" field in response from crt service: {response.text}. Probably, the quota has been exhausted')
+            raise KeyError(f'No "data" field in response from crt service: {response.text}. Probably, the quota has been exhausted')
 
         _, data = read_wav(
             BytesIO(
