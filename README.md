@@ -60,6 +60,15 @@ Install the following dependencies manually:
 sudo apt-get install libportaudio2
 ```
 
+Also you need to clone [`unofficial mail ru cloud api package`][7] for being able to seamlessly upload generated files to mail ru cloud:
+
+```sh
+pushd "/home/$USER"
+git clone git@github.com:zeionara/carma.git
+popd
+ln -s "/home/$USER/carma/cloud_mail_api"
+```
+
 ## Testing
 
 To run tests use the following statement:
@@ -74,3 +83,4 @@ python -m unittest discover test
 [4]: https://developers.sber.ru/portal/products/smartspeech
 [5]: https://cloud.speechpro.com/home
 [6]: https://huggingface.co/spaces/coqui/xtts
+[7]: https://github.com/zeionara/carma

@@ -58,7 +58,10 @@ class Raconteur(ABC):
     def _say(self, text: str):
         combined = np.array([], dtype = self.dtype)
 
+        # print(text)
+
         for chunk in self.splitter.split(text):
+            # print(chunk, len(chunk))
             combined = np.concatenate((combined, self.predict(chunk)))
 
         return combined

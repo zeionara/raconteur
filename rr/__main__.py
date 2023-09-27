@@ -4,6 +4,8 @@ from time import time
 from click import group, argument, option, Choice
 from pandas import read_csv
 
+from cloud_mail_api import CloudMail
+
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
@@ -65,7 +67,13 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--skip-if-exists', '-k', help = 'skip anek if audio file with the same name already exists', is_flag = True)
-def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool, skip_if_exists: bool):
+@option('--username', '-u', help = 'cloud mail ru username', type = str)
+@option('--password', '-p', help = 'cloud mail ru password', type = str)
+@option('--cloud-root', '-x', help = 'root folder where to upload generated mp3 files', type = str)
+def handle_aneks(
+    source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool, skip_if_exists: bool,
+    username: str, password: str, cloud_root: str
+):
     if not path.isdir(destination):
         makedirs(destination)
 
@@ -74,6 +82,12 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
     n_aneks = 0
 
     speaker = RaconteurFactory(gpu, russian).make(engine, max_n_characters)
+
+    cm = None
+
+    if username is not None and password is not None and cloud_root is not None:
+        cm = CloudMail(username, password)
+        cm.auth()
 
     start = time()
 
@@ -85,15 +99,23 @@ def handle_aneks(source: str, destination: str, max_n_characters: int, top_n: in
         (
             df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
         )
-    ).loc[:, ('id', 'text')].iterrows():
+    ).loc[:, ('id', 'text', 'source')].iterrows():
         text = row['text']
-        filename = path.join(destination, f'{row["id"]:08d}.mp3')
+        
+        name = f'{row["id"]:08d}.{row["source"]}.mp3'
+        filename = path.join(destination, name)
+
+        # print(f'Handling "{text}"')
 
         if not skip_if_exists or not path.isfile(filename):
             speaker.speak(
                 text = text,
                 filename = filename
             )
+
+            if cm is not None:
+                # print(filename, f'{cloud_root}/{name}')
+                cm.api.file.add(filename, f'{cloud_root}/{name}')
 
         n_aneks += 1
 
