@@ -1,9 +1,10 @@
 from os import path, makedirs
-from time import time
+from time import time, sleep
 
 from click import group, argument, option, Choice
 from pandas import read_csv
 
+from beep import beep
 from cloud_mail_api import CloudMail
 
 from .Bark import Bark
@@ -70,9 +71,11 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 @option('--username', '-u', help = 'cloud mail ru username', type = str)
 @option('--password', '-p', help = 'cloud mail ru password', type = str)
 @option('--cloud-root', '-x', help = 'root folder where to upload generated mp3 files', type = str)
+@option('--upload-and-quit', '-q', help = 'upload files to cloud if they exist before starting speech generation', is_flag = True)
+@option('--verbose', '-v', help = 'whether to enable additional logging', is_flag = True)
 def handle_aneks(
     source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool, skip_if_exists: bool,
-    username: str, password: str, cloud_root: str
+    username: str, password: str, cloud_root: str, upload_and_quit: bool, verbose: bool
 ):
     if not path.isdir(destination):
         makedirs(destination)
@@ -91,38 +94,61 @@ def handle_aneks(
 
     start = time()
 
-    for _, row in (
-        (
-            df if offset is None else df.iloc[offset:,]
-        )
-        if top_n is None else
-        (
-            df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
-        )
-    ).loc[:, ('id', 'text', 'source')].iterrows():
-        text = row['text']
-        
-        name = f'{row["id"]:08d}.{row["source"]}.mp3'
-        filename = path.join(destination, name)
-
-        # print(f'Handling "{text}"')
-
-        if not skip_if_exists or not path.isfile(filename):
-            speaker.speak(
-                text = text,
-                filename = filename
+    with beep():
+        for _, row in (
+            (
+                df if offset is None else df.iloc[offset:,]
             )
+            if top_n is None else
+            (
+                df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
+            )
+        ).loc[:, ('id', 'text', 'source')].iterrows():
+            text = row['text']
 
-            if cm is not None:
+            name = f'{row["id"]:08d}.{row["source"]}.mp3'
+            # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
+            filename = path.join(destination, name)
+
+            # print(f'Handling "{text}"')
+            if upload_and_quit and cm is not None and path.isfile(filename):
                 # print(filename, f'{cloud_root}/{name}')
-                cm.api.file.add(filename, f'{cloud_root}/{name}')
+                status = None
 
-        n_aneks += 1
+                while status != 200:
+                    response = cm.api.file.add(filename, f'{cloud_root}/{name}')
+                    status = response['status']
 
-        print(f'Handled {n_aneks} aneks')
+                # response = cm.api.file(f'{cloud_root}/{name}')
 
-    elapsed = time() - start
-    print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+                # if response['status'] != 200:
+                #     print(response)
+
+                # cm.api.file.remove(f'{cloud_root}/{name_copy}')
+
+            if not skip_if_exists or not path.isfile(filename):
+                if verbose:
+                    print(text)
+
+                try:
+                    speaker.speak(
+                        text = text,
+                        filename = filename
+                    )
+                except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
+                    sleep(10)
+
+                    speaker.speak(
+                        text = text,
+                        filename = filename
+                    )
+
+            n_aneks += 1
+
+            print(f'Handled {n_aneks} aneks')
+
+        elapsed = time() - start
+        print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
 
 
 if __name__ == '__main__':

@@ -64,6 +64,7 @@ dependencies:
     - audioread==3.0.0
     - babel==2.12.1
     - bangla==0.0.2
+    - beepki==0.0.2
     - blinker==1.6.2
     - bnnumerizer==0.0.2
     - bnunicodenormalizer==0.1.1
@@ -191,6 +192,7 @@ dependencies:
     - pydocstyle==6.3.0
     - pydub==0.25.1
     - pyflakes==3.0.1
+    - pygame==2.5.2
     - pygments==2.15.1
     - pylint==2.16.2
     - pynndescent==0.5.10
