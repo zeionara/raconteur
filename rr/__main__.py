@@ -130,18 +130,18 @@ def handle_aneks(
                 if verbose:
                     print(text)
 
-                try:
-                    speaker.speak(
-                        text = text,
-                        filename = filename
-                    )
-                except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
-                    sleep(10)
+                # try:
+                speaker.speak(
+                    text = text,
+                    filename = filename
+                )
+                # except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
+                #     sleep(10)
 
-                    speaker.speak(
-                        text = text,
-                        filename = filename
-                    )
+                #     speaker.speak(
+                #         text = text,
+                #         filename = filename
+                #     )
 
             n_aneks += 1
 
