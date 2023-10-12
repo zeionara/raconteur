@@ -49,11 +49,16 @@ class Crt(Raconteur):
             timeout = TIMEOUT
         )
 
+        data = response.json().get('data')
+
+        if data is None:
+            raise KeyError(f'No "data" field in response from crt service: {response.text}. Probably, the quota has been exhausted')
+
         _, data = read_wav(
             BytesIO(
                 base64.decodebytes(
                     bytes(
-                        response.json()['data'],
+                        data,
                         'utf-8'
                     )
                 )

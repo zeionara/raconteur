@@ -4,6 +4,7 @@ from RUTTS import TTS
 from ruaccent import RUAccent
 from transliterate import translit
 from num2words import num2words
+# from onnxruntime.capi.onnxruntime_pybind11_state import RuntimeException
 
 from .Raconteur import Raconteur
 
@@ -48,8 +49,15 @@ class RuTTS(Raconteur):
             number = match.group(0)
             text = text.replace(number, num2words(number, lang = 'ru'), 1)
 
+        # Add accent marks
+
+        try:
+            text = self.accentizer.process_all(text)
+        except Exception:
+            print(f'Can\'t put accents in text "{text}"')
+
         return self.tts(
-            self.accentizer.process_all(text),
+            text,
             lenght_scale = self.length_scale
         )
 

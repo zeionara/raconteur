@@ -63,6 +63,9 @@ class Raconteur(ABC):
         chunks = tqdm(items) if pbar else items
 
         for chunk in chunks:
+            # print(text)
+            # print(chunk, len(chunk))
+
             combined = np.concatenate((combined, self.predict(chunk)))
 
         return combined
