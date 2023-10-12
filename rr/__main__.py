@@ -1,11 +1,13 @@
 from os import path, makedirs
-from time import time, sleep
+from time import time
 
 from click import group, argument, option, Choice
 from pandas import read_csv
 
 from beep import beep
 from cloud_mail_api import CloudMail
+from fuck import ProfanityHandler
+from tqdm import tqdm
 
 from .Bark import Bark
 from .RuTTS import RuTTS
@@ -16,6 +18,7 @@ from .Coqui import Coqui
 from .RaconteurFactory import RaconteurFactory
 
 from .util import one_is_not_none, read
+from .SpeechIndex import SpeechIndex
 
 
 ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name), case_sensitive = False)
@@ -149,6 +152,51 @@ def handle_aneks(
 
         elapsed = time() - start
         print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+
+
+@main.command()
+@argument('anecdotes', type = str)
+@argument('speech-path', type = str)
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Crt.name)
+@option('--offset', '-o', help = 'number of entries to skip', type = int, default = None)
+def uncensor(anecdotes: str, speech_path: str, engine: str, offset: int):
+    index = SpeechIndex(speech_path)
+    ph = ProfanityHandler()
+
+    speaker = RaconteurFactory().make(engine, max_n_characters = 300)
+
+    df = read_csv(anecdotes, sep = '\t')
+
+    n_rows, _ = df.shape
+    pbar = tqdm(total = n_rows, desc = 'Handling documents', initial = 0 if offset is None else offset)
+
+    df = df if offset is None else df.iloc[offset:, ]
+
+    n_spoken = 0
+
+    for i, row in df.iterrows():
+        text, changed, _ = ph.uncensor(row['text'])
+
+        if changed:
+            try:
+                speaker.speak(
+                    text = text,
+                    filename = index.get(row['source'], row['id']).path
+                )
+
+                n_spoken += 1
+                pbar.desc = f'Handling documents (spoken: {n_spoken})'
+            except Exception:
+                print('Failed to complete the operation, continue from', i)
+                raise
+            # print('=' * 10)
+            # print(row['text'])
+            # print('-' * 10)
+            # print(text)
+            # print('*' * 10)
+            # print(index.get(row['source'], row['id']))
+
+        pbar.update()
 
 
 if __name__ == '__main__':
