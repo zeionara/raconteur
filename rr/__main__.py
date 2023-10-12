@@ -53,7 +53,7 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
     #     language = 'en'
     # )
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination)
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination, pbar = True)
     # RaconteurFactory(gpu, russian).make('crt', max_n_characters).predict(text)
 
 

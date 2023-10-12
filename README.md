@@ -24,7 +24,7 @@ Currently the following engines are supported:
 1. [bark][3] - multilingual model, requires a lot of gpu;
 1. [salute][4] - adapter to the cloud service from sber, requires environment variable `SALUTE_SPEECH_AUTH` to be set;
 1. [crt][5] - adapter to the cloud service from crt, requires environment variables `CRT_USERNAME`, `CRT_PASSWORD`, `CRT_DOMAIN` to be set;
-1. [coqui][6] - multilingual `xtts` model, utilizes a moderate amount of gpu (much less than [bark][3], but works better), works very slowly, **requires file `assets/female.wav`** which can be downloaded from [here][6] and replaced with desired speaker's voice recording).
+1. [coqui][6] - multilingual `xtts` model, utilizes a moderate amount of gpu (much less than [bark][3], but works better), works very slowly (270.43189 seconds per anek in average on gtx 1650 vs 3-5 seconds for rutts), **requires file `assets/female.wav`** which can be downloaded from [here][6] and replaced with desired speaker's voice recording).
 
 For a full list of available cli options see [`__main__.py`][2].
 

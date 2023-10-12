@@ -5,6 +5,7 @@ import numpy as np
 from IPython.display import Audio
 from pydub import AudioSegment
 from music_tag import load_file
+from tqdm import tqdm
 
 from .Splitter import Splitter
 
@@ -16,12 +17,12 @@ class Raconteur(ABC):
         self.tmp_filename = tmp_filename
         self.splitter = splitter
 
-    def speak(self, text: str, filename: str):
+    def speak(self, text: str, filename: str, pbar: bool = False):
         write_wav(
             self.tmp_filename,
             self.sample_rate,
             # audio := generate_audio(row['text'], history_prompt = ARTIST)
-            audio := self._say(text)
+            audio := self._say(text, pbar = pbar)
         )
 
         AudioSegment.from_wav(self.tmp_filename).export(filename, format = 'mp3')
@@ -55,10 +56,13 @@ class Raconteur(ABC):
     def set_file_meta(self, file):
         pass
 
-    def _say(self, text: str):
+    def _say(self, text: str, pbar: bool = False):
         combined = np.array([], dtype = self.dtype)
 
-        for chunk in self.splitter.split(text):
+        items = self.splitter.split(text)
+        chunks = tqdm(items) if pbar else items
+
+        for chunk in chunks:
             combined = np.concatenate((combined, self.predict(chunk)))
 
         return combined
