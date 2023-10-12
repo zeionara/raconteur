@@ -159,11 +159,16 @@ def handle_aneks(
 @argument('speech-path', type = str)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Crt.name)
 @option('--offset', '-o', help = 'number of entries to skip', type = int, default = None)
-def uncensor(anecdotes: str, speech_path: str, engine: str, offset: int):
+@option('--cloud-root', '-c', help = 'root folder at the mail.ru cloud - if this option is set, the command works in upload-only mode meaning that existing files are just uploaded to the cloud')
+@option('--username', '-u', help = 'username for updating files in the cloud')
+@option('--password', '-p', help = 'password for updating files in the cloud')
+def uncensor(anecdotes: str, speech_path: str, engine: str, offset: int, cloud_root: str, username: str, password: str):
+    cm = None if cloud_root is None else CloudMail(username, password)
+
     index = SpeechIndex(speech_path)
     ph = ProfanityHandler()
 
-    speaker = RaconteurFactory().make(engine, max_n_characters = 300)
+    speaker = RaconteurFactory().make(engine, max_n_characters = 300) if cloud_root is None else None
 
     df = read_csv(anecdotes, sep = '\t')
 
@@ -178,17 +183,39 @@ def uncensor(anecdotes: str, speech_path: str, engine: str, offset: int):
         text, changed, _ = ph.uncensor(row['text'])
 
         if changed:
-            try:
-                speaker.speak(
-                    text = text,
-                    filename = index.get(row['source'], row['id']).path
-                )
+            if cloud_root is None:
+                try:
+                    speaker.speak(
+                        text = text,
+                        filename = index.get(row['source'], row['id']).path
+                    )
 
-                n_spoken += 1
-                pbar.desc = f'Handling documents (spoken: {n_spoken})'
-            except Exception:
-                print('Failed to complete the operation, continue from', i)
-                raise
+                    n_spoken += 1
+                    pbar.desc = f'Handling documents (spoken: {n_spoken})'
+                except Exception:
+                    print('Failed to complete the operation, continue from', i)
+                    raise
+            else:
+                location = index.get(row['source'], row['id'])
+
+                # remote_path = f'{cloud_root}/{location.file}'.replace('.mp3', ' (1).mp3')
+                remote_path = f'{cloud_root}/{location.file}'
+
+                response = cm.api.file.remove(remote_path)
+
+                # if response['status'] == 200:
+                #     print(remote_path)
+
+                if response['status'] != 200:
+                    raise ValueError(f'Cannot remove file {location.file}')
+
+                response = cm.api.file.add(location.path, remote_path)
+
+                if response['status'] != 200:
+                    raise ValueError(f'Cannot upload file {location.file}')
+
+                print(f'Uploaded file {location.file}')
+
             # print('=' * 10)
             # print(row['text'])
             # print('-' * 10)
