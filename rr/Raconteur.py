@@ -17,7 +17,7 @@ class Raconteur(ABC):
         self.tmp_filename = tmp_filename
         self.splitter = splitter
 
-    def speak(self, text: str, filename: str, pbar: bool = False):
+    def speak(self, text: str, filename: str, pbar: bool = False, save_text: str = True):
         write_wav(
             self.tmp_filename,
             self.sample_rate,
@@ -29,9 +29,10 @@ class Raconteur(ABC):
 
         file = load_file(filename)
 
-        file['title'] = text
-        file['lyrics'] = text
-        file['comment'] = text
+        if save_text:
+            file['title'] = text
+            file['lyrics'] = text
+            file['comment'] = text
 
         self.set_file_meta(file)
 

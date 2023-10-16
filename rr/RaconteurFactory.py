@@ -7,6 +7,7 @@ from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 from .Coqui import Coqui
+from .Silero import Silero
 
 
 class RaconteurFactory:
@@ -14,7 +15,7 @@ class RaconteurFactory:
         self.gpu = gpu
         self.ru = ru
 
-    def make(self, engine: str, max_n_characters: int):
+    def make(self, engine: str, max_n_characters: int, artist: str = None):
         match engine:
             case SaluteSpeech.name:
                 return SaluteSpeech(
@@ -51,6 +52,14 @@ class RaconteurFactory:
                     gpu = self.gpu,
                     ru = self.ru,
                     splitter = Splitter(200 if max_n_characters is None else max_n_characters)
+                )
+            case Silero.name:
+                return Silero(
+                    model = 'v4' if self.ru else 'v3',
+                    gpu = self.gpu,
+                    artist = 'xenia' if artist is None else artist,
+                    ru = self.ru,
+                    splitter = Splitter(1000 if max_n_characters is None else max_n_characters)
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')

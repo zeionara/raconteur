@@ -5,15 +5,17 @@ from click import group, argument, option, Choice
 from pandas import read_csv
 
 from beep import beep
-from cloud_mail_api import CloudMail
+# from cloud_mail_api import CloudMail
 from fuck import ProfanityHandler
 from tqdm import tqdm
+# import torch
 
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 from .Coqui import Coqui
+from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
@@ -21,7 +23,7 @@ from .util import one_is_not_none, read
 from .SpeechIndex import SpeechIndex
 
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name), case_sensitive = False)
+ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
 
 
 @group()
@@ -37,28 +39,40 @@ def main():
 @option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str):
+@option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
+@option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool):
+
+    # language = 'ru'
+    # model_id = 'v4_ru'
+    # sample_rate = 48_000
+    # speaker = 'xenia'
+
+    # device = torch.device('cuda')
+
+    # model, text = torch.hub.load(
+    #     repo_or_dir = 'snakers4/silero-models',
+    #     model = 'silero_tts',
+    #     language = language,
+    #     speaker = model_id
+    # )
+
+    # model.to(device)
+
+    # audio = model.apply_tts(
+    #     text = text,
+    #     speaker = speaker,
+    #     sample_rate = sample_rate
+    # )
+
+    # print(audio.numpy())
+    # print(audio.dtype)
+
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
 
-    # tts = TTS('tts_models/multilingual/multi-dataset/xtts_v1').to('cuda' if gpu else 'cpu')
-
-    # print(tts.tts(
-    #     text = text,
-    #     speaker_wav = 'assets/female.wav',
-    #     language = 'en'
-    # ))
-
-    # tts.tts_to_file(
-    #     text = text,
-    #     file_path = 'audio.wav',
-    #     speaker_wav = 'assets/female.wav',
-    #     language = 'en'
-    # )
-
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination, pbar = True)
-    # RaconteurFactory(gpu, russian).make('crt', max_n_characters).predict(text)
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist).speak(text, filename = destination, pbar = True, save_text = not drop_text)
 
 
 @main.command()
