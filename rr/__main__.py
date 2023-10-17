@@ -55,8 +55,6 @@ def alternate(text: str, artist_one: str, artist_two: str):
 
     pbar = tqdm(total = len(lines))
 
-    engine = None
-
     for line in lines:
         if line:
             # You can't create two objects for the artist and reuse them - in this case the program hangs after the first iteration
@@ -65,8 +63,7 @@ def alternate(text: str, artist_one: str, artist_two: str):
 
         pbar.update()
 
-    if engine is not None:
-        engine.save(accumulator, filename = output_path)
+    a1.save(accumulator, filename = output_path)
 
 
 @main.command()
