@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 
 from scipy.io.wavfile import write as write_wav
@@ -17,19 +18,26 @@ class Raconteur(ABC):
         self.tmp_filename = tmp_filename
         self.splitter = splitter
 
-    def speak(self, text: str, filename: str, pbar: bool = False, save_text: str = True):
+    def speak(self, text: str, filename: str = None, pbar: bool = False, save_text: str = True, accumulator = None):
+        audio = self._say(text, pbar = pbar, accumulator = accumulator)
+
+        if accumulator is None:
+            self.save(audio, text if save_text else None, filename)
+
+        return audio
+
+    def save(self, audio: np.array, filename: str, text: str = None):
         write_wav(
             self.tmp_filename,
             self.sample_rate,
-            # audio := generate_audio(row['text'], history_prompt = ARTIST)
-            audio := self._say(text, pbar = pbar)
+            audio
         )
 
         AudioSegment.from_wav(self.tmp_filename).export(filename, format = 'mp3')
 
         file = load_file(filename)
 
-        if save_text:
+        if text is not None:
             file['title'] = text
             file['lyrics'] = text
             file['comment'] = text
@@ -37,6 +45,8 @@ class Raconteur(ABC):
         self.set_file_meta(file)
 
         file.save()
+
+        os.remove(self.tmp_filename)
 
         return Audio(audio, rate = self.sample_rate)
 
@@ -57,8 +67,8 @@ class Raconteur(ABC):
     def set_file_meta(self, file):
         pass
 
-    def _say(self, text: str, pbar: bool = False):
-        combined = np.array([], dtype = self.dtype)
+    def _say(self, text: str, pbar: bool = False, accumulator = None):
+        combined = np.array([], dtype = self.dtype) if accumulator is None else accumulator
 
         items = self.splitter.split(text)
         chunks = tqdm(items) if pbar else items

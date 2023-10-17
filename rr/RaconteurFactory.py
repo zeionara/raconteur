@@ -15,7 +15,7 @@ class RaconteurFactory:
         self.gpu = gpu
         self.ru = ru
 
-    def make(self, engine: str, max_n_characters: int, artist: str = None):
+    def make(self, engine: str, max_n_characters: int = None, artist: str = None):
         match engine:
             case SaluteSpeech.name:
                 return SaluteSpeech(

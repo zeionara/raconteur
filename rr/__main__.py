@@ -3,6 +3,7 @@ from time import time
 
 from click import group, argument, option, Choice
 from pandas import read_csv
+import numpy as np
 
 from beep import beep
 # from cloud_mail_api import CloudMail
@@ -32,6 +33,44 @@ def main():
 
 
 @main.command()
+@argument('text', type = str)  # file must be in a format exported by much module: see https://github.com/zeionara/much
+@option('--artist-one', '-a1', help = 'first artist to say the replic', default = 'xenia')
+@option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
+def alternate(text: str, artist_one: str, artist_two: str):
+    # assert artist_one != artist_two, 'The two artist must not be same'
+
+    output_path = f'{path.splitext(text)[0]}.mp3'
+
+    factory = RaconteurFactory(gpu = True, ru = True)
+
+    # a1 = factory.make(engine = 'silero', artist = artist_one)
+    # a2 = factory.make(engine = 'silero', artist = artist_two)
+
+    a1_speaks = True
+
+    accumulator = np.array([], dtype = 'float32')
+
+    with open(text, 'r') as file:
+        lines = file.read().split('\n')
+
+    pbar = tqdm(total = len(lines))
+
+    engine = None
+
+    for line in lines:
+        if line:
+            # print(f'{"a1" if a1_speaks else "a2"}: {line}')
+            # accumulator = (a1 if a1_speaks else a2).speak(line, save_text = False, accumulator = accumulator)
+            accumulator = (engine := factory.make(engine = 'silero', artist = artist_one if a1_speaks else artist_two)).speak(line, save_text = False, accumulator = accumulator)
+            a1_speaks = not a1_speaks
+
+        pbar.update()
+
+    if engine is not None:
+        engine.save(accumulator, filename = output_path)
+
+
+@main.command()
 @argument('text', type = str, required = False)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
@@ -42,31 +81,6 @@ def main():
 @option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
 @option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
 def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool):
-
-    # language = 'ru'
-    # model_id = 'v4_ru'
-    # sample_rate = 48_000
-    # speaker = 'xenia'
-
-    # device = torch.device('cuda')
-
-    # model, text = torch.hub.load(
-    #     repo_or_dir = 'snakers4/silero-models',
-    #     model = 'silero_tts',
-    #     language = language,
-    #     speaker = model_id
-    # )
-
-    # model.to(device)
-
-    # audio = model.apply_tts(
-    #     text = text,
-    #     speaker = speaker,
-    #     sample_rate = sample_rate
-    # )
-
-    # print(audio.numpy())
-    # print(audio.dtype)
 
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
