@@ -57,7 +57,7 @@ class RaconteurFactory:
                 return Silero(
                     model = 'v4' if self.ru else 'v3',
                     gpu = self.gpu,
-                    artist = 'xenia' if artist is None else artist,
+                    artist = ('xenia' if self.ru else 'en_1') if artist is None else artist,
                     ru = self.ru,
                     splitter = Splitter(500 if max_n_characters is None else max_n_characters)
                 )

@@ -22,7 +22,7 @@ class Raconteur(ABC):
         audio = self._say(text, pbar = pbar, accumulator = accumulator)
 
         if accumulator is None:
-            self.save(audio, text if save_text else None, filename)
+            self.save(audio, filename, text if save_text else None)
 
         return audio
 
