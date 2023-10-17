@@ -37,14 +37,11 @@ def main():
 @option('--artist-one', '-a1', help = 'first artist to say the replic', default = 'xenia')
 @option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
 def alternate(text: str, artist_one: str, artist_two: str):
-    # assert artist_one != artist_two, 'The two artist must not be same'
+    assert artist_one != artist_two, 'The two artist must not be same'
 
     output_path = f'{path.splitext(text)[0]}.mp3'
 
     factory = RaconteurFactory(gpu = True, ru = True)
-
-    # a1 = factory.make(engine = 'silero', artist = artist_one)
-    # a2 = factory.make(engine = 'silero', artist = artist_two)
 
     a1_speaks = True
 
@@ -59,8 +56,7 @@ def alternate(text: str, artist_one: str, artist_two: str):
 
     for line in lines:
         if line:
-            # print(f'{"a1" if a1_speaks else "a2"}: {line}')
-            # accumulator = (a1 if a1_speaks else a2).speak(line, save_text = False, accumulator = accumulator)
+            # You can't create two objects for the artist and reuse them - in this case the program hangs after the first iteration
             accumulator = (engine := factory.make(engine = 'silero', artist = artist_one if a1_speaks else artist_two)).speak(line, save_text = False, accumulator = accumulator)
             a1_speaks = not a1_speaks
 
