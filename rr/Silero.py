@@ -10,28 +10,40 @@ class Silero(Raconteur):
     name = 'silero'
 
     def __init__(self, model: str = 'v4', gpu: bool = True, artist: str = 'xenia', ru: bool = True, *args, **kwargs):
-        self.model_id = model
+        self.model = model
         self.artist = artist
 
-        language = 'ru' if ru else 'en'
+        self.language = 'ru' if ru else 'en'
 
-        self.device = device = torch.device('cuda' if gpu else 'cpu')
+        self.device = torch.device('cuda' if gpu else 'cpu')
 
-        model, _ = torch.hub.load(
-            repo_or_dir = REPO,
-            model = MODEL,
-            language = 'ru' if ru else 'en',
-            speaker = f'{model}_{language}'
-        )
+        # model, _ = torch.hub.load(
+        #     repo_or_dir = REPO,
+        #     model = MODEL,
+        #     language = 'ru' if ru else 'en',
+        #     speaker = f'{model}_{language}'
+        # )
 
-        model.to(device)
-
-        self.model = model
+        # self.model = model
 
         super().__init__(*args, **kwargs)
 
     def predict(self, text: str):
-        data = self.model.apply_tts(
+        # data = self.model.apply_tts(
+        #     text = text,
+        #     speaker = self.artist,
+        #     sample_rate = self.sample_rate
+        # )
+        model, _ = torch.hub.load(
+            repo_or_dir = REPO,
+            model = MODEL,
+            language = self.language,
+            speaker = f'{self.model}_{self.language}'
+        )
+
+        model.to(self.device)
+
+        data = model.apply_tts(
             text = text,
             speaker = self.artist,
             sample_rate = self.sample_rate

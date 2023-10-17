@@ -59,7 +59,7 @@ class RaconteurFactory:
                     gpu = self.gpu,
                     artist = 'xenia' if artist is None else artist,
                     ru = self.ru,
-                    splitter = Splitter(1000 if max_n_characters is None else max_n_characters)
+                    splitter = Splitter(500 if max_n_characters is None else max_n_characters)
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')

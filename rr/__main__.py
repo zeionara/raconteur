@@ -43,6 +43,9 @@ def alternate(text: str, artist_one: str, artist_two: str):
 
     factory = RaconteurFactory(gpu = True, ru = True)
 
+    a1 = factory.make(engine = 'silero', artist = artist_one)
+    a2 = factory.make(engine = 'silero', artist = artist_two)
+
     a1_speaks = True
 
     accumulator = np.array([], dtype = 'float32')
@@ -57,7 +60,7 @@ def alternate(text: str, artist_one: str, artist_two: str):
     for line in lines:
         if line:
             # You can't create two objects for the artist and reuse them - in this case the program hangs after the first iteration
-            accumulator = (engine := factory.make(engine = 'silero', artist = artist_one if a1_speaks else artist_two)).speak(line, save_text = False, accumulator = accumulator)
+            accumulator = (a1 if a1_speaks else a2).speak(line, save_text = False, accumulator = accumulator)
             a1_speaks = not a1_speaks
 
         pbar.update()
