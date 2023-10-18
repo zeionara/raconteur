@@ -1,6 +1,9 @@
 import torch
 
+from transliterate import translit
+
 from .Raconteur import Raconteur
+from .util import translate_numbers
 
 REPO = 'snakers4/silero-models'
 MODEL = 'silero_tts'
@@ -44,7 +47,8 @@ class Silero(Raconteur):
         model.to(self.device)
 
         data = model.apply_tts(
-            text = text,
+            text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language),
+            # text = text,
             speaker = self.artist,
             sample_rate = self.sample_rate
         )
