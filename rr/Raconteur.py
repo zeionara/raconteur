@@ -1,5 +1,6 @@
 import os
 from abc import ABC, abstractmethod
+from uuid import uuid4
 
 from scipy.io.wavfile import write as write_wav
 import numpy as np
@@ -14,8 +15,10 @@ from .Splitter import Splitter
 class Raconteur(ABC):
     name = None
 
-    def __init__(self, splitter: Splitter, tmp_filename: str = "/tmp/audio.wav"):
-        self.tmp_filename = tmp_filename
+    def __init__(self, splitter: Splitter, tmp_filename: str = None):
+        if tmp_filename is None:
+            self.tmp_filename = os.path.join(os.sep, 'tmp', f'{str(uuid4())}.wav')
+
         self.splitter = splitter
 
     def speak(self, text: str, filename: str = None, pbar: bool = False, save_text: str = True, accumulator = None, batch_size: int = None):

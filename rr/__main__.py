@@ -95,10 +95,10 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 
         n_chunks = math.ceil(len(text) / batch_size)
 
-        val = input(f'There will be {n_chunks} chunks, ok? (y/N): ')
+        # val = input(f'There will be {n_chunks} chunks, ok? (y/N): ')
 
-        if val != 'y':
-            return
+        # if val != 'y':
+        #     return
 
         if not path.isdir(destination):
             makedirs(destination)

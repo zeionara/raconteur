@@ -56,15 +56,19 @@ class Silero(Raconteur):
         # if self.ssml:
         #     print(text_with_tags)
 
-        data = model.apply_tts(
-            text = None if self.ssml else text,
-            ssml_text = text_with_tags if self.ssml else None,
-            # text = text,
-            speaker = self.artist,
-            sample_rate = self.sample_rate,
-            put_accent = True,
-            put_yo = True
-        )
+        try:
+            data = model.apply_tts(
+                text = None if self.ssml else text,
+                ssml_text = text_with_tags if self.ssml else None,
+                # text = text,
+                speaker = self.artist,
+                sample_rate = self.sample_rate,
+                put_accent = True,
+                put_yo = True
+            )
+        except Exception:
+            print('Text: ', text_with_tags if self.ssml else text)
+            raise
 
         return data.numpy()
 

@@ -59,7 +59,7 @@ class RaconteurFactory:
                     gpu = self.gpu,
                     artist = ('xenia' if self.ru else 'en_1') if artist is None else artist,
                     ru = self.ru,
-                    splitter = Splitter(500 if max_n_characters is None else max_n_characters),
+                    splitter = Splitter(400 if max_n_characters is None else max_n_characters),
                     ssml = ssml
                 )
             case _:
