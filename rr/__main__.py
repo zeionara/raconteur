@@ -1,5 +1,7 @@
 from os import path, makedirs
 from time import time
+import math
+from pathlib import Path
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -71,18 +73,51 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
-@option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
+@option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = None)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
 @option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
 @option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool):
-
+@option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool, batch_size: int):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist).speak(text, filename = destination, pbar = True, save_text = not drop_text)
+    if batch_size is not None:
+        if destination is None:
+            txt_stem = Path(txt).stem
+            destination = path.join(txt[::-1].split('/', maxsplit = 1)[1][::-1], txt_stem)
+
+            # print(destination)
+            # raise ValueError('Destination name is required when splitting output file')
+
+        n_chunks = math.ceil(len(text) / batch_size)
+
+        val = input(f'There will be {n_chunks} chunks, ok? (y/N): ')
+
+        if val != 'y':
+            return
+
+        if not path.isdir(destination):
+            makedirs(destination)
+
+        stem = Path(destination).stem
+        batch_index_max_length = len(str(n_chunks))
+        # template = "f'" + path.join(destination, f'{stem}-{{batch:0{batch_index_max_length}d}}.mp3') + "'"
+        template = path.join(destination, f'{stem}-{{batch:0{batch_index_max_length}d}}.mp3')
+
+        destination = template
+
+        # batch = 8
+        # print(eval(template))
+
+        # print(template.format(batch = 8))
+
+    elif destination is None:
+        destination = 'assets/speech.mp3'
+
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist).speak(text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size)
 
 
 @main.command()
