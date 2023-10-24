@@ -15,7 +15,7 @@ class RaconteurFactory:
         self.gpu = gpu
         self.ru = ru
 
-    def make(self, engine: str, max_n_characters: int = None, artist: str = None):
+    def make(self, engine: str, max_n_characters: int = None, artist: str = None, ssml: bool = False):
         match engine:
             case SaluteSpeech.name:
                 return SaluteSpeech(
@@ -59,7 +59,8 @@ class RaconteurFactory:
                     gpu = self.gpu,
                     artist = ('xenia' if self.ru else 'en_1') if artist is None else artist,
                     ru = self.ru,
-                    splitter = Splitter(500 if max_n_characters is None else max_n_characters)
+                    splitter = Splitter(500 if max_n_characters is None else max_n_characters),
+                    ssml = ssml
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')

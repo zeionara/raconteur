@@ -8,17 +8,21 @@ from .util import translate_numbers
 REPO = 'snakers4/silero-models'
 MODEL = 'silero_tts'
 
+DOUBLE_LINE_BREAK = '\n\n'
+PAUSE = '\n<break time="2000ms"/>\n'
+
 
 class Silero(Raconteur):
     name = 'silero'
 
-    def __init__(self, model: str = 'v4', gpu: bool = True, artist: str = 'xenia', ru: bool = True, *args, **kwargs):
+    def __init__(self, model: str = 'v4', gpu: bool = True, artist: str = 'xenia', ru: bool = True, ssml: bool = False, *args, **kwargs):
         self.model = model
         self.artist = artist
 
         self.language = 'ru' if ru else 'en'
 
         self.device = torch.device('cuda' if gpu else 'cpu')
+        self.ssml = ssml
 
         # model, _ = torch.hub.load(
         #     repo_or_dir = REPO,
@@ -46,11 +50,20 @@ class Silero(Raconteur):
 
         model.to(self.device)
 
+        text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        text_with_tags = f'<speak>\n<p>\n{text.replace(DOUBLE_LINE_BREAK, PAUSE)}\n</p>\n</speak>'
+
+        # if self.ssml:
+        #     print(text_with_tags)
+
         data = model.apply_tts(
-            text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language),
+            text = None if self.ssml else text,
+            ssml_text = text_with_tags if self.ssml else None,
             # text = text,
             speaker = self.artist,
-            sample_rate = self.sample_rate
+            sample_rate = self.sample_rate,
+            put_accent = True,
+            put_yo = True
         )
 
         return data.numpy()

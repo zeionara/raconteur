@@ -89,7 +89,20 @@ class Splitter:
             else:
                 chunks.append(''.join(current_chunk))
 
+        # unclosed_tag = False
+
         for c in text:
+            # if unclosed_tag or c in ('<', '>'):
+            #     if c == '<':
+            #         unclosed_tag = True
+            #     elif c == '>':
+            #         unclosed_tag = False
+
+            #     push(c)
+            #     previous_c = c
+
+            #     continue
+
             if not SPACE.fullmatch(c) and previous_c is not None and SPACE.fullmatch(previous_c):  # token + space has finished
                 watching_space = False
                 # print(current_token)

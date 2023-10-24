@@ -79,7 +79,8 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
 @option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
 @option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool, batch_size: int):
+@option('--ssml', '-m', help = 'does input text contain ssml tags', is_flag = True)
+def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool, batch_size: int, ssml: bool = False):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
@@ -117,7 +118,7 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
     elif destination is None:
         destination = 'assets/speech.mp3'
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist).speak(text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size)
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size)
 
 
 @main.command()
