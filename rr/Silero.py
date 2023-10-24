@@ -53,6 +53,8 @@ class Silero(Raconteur):
         text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
         text_with_tags = f'<speak>\n<p>\n{text.replace(DOUBLE_LINE_BREAK, PAUSE)}\n</p>\n</speak>'
 
+        text_with_tags = text_with_tags.replace('»', '"').replace('«', '"').replace('&', 'энд')
+
         # if self.ssml:
         #     print(text_with_tags)
 

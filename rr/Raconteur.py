@@ -99,7 +99,7 @@ class Raconteur(ABC):
             def save():
                 nonlocal batch_length, combined, batch_index
 
-                self.save(combined, path_template.format(batch = batch_index))
+                self.save(combined, path_template.format(batch = batch_index), text = f'{batch_index:02d}')
 
                 batch_length = 0
                 combined = np.array([], dtype = self.dtype)
