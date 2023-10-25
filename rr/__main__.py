@@ -7,9 +7,9 @@ from click import group, argument, option, Choice
 from pandas import read_csv
 import numpy as np
 
-from beep import beep
+# from beep import beep
 # from cloud_mail_api import CloudMail
-from fuck import ProfanityHandler
+# from fuck import ProfanityHandler
 from tqdm import tqdm
 # import torch
 
@@ -80,7 +80,11 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
 @option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
 @option('--ssml', '-m', help = 'does input text contain ssml tags', is_flag = True)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, drop_text: bool, batch_size: int, ssml: bool = False):
+@option('--first-batch-index', '-f', help = 'in a multibatch setting from what number to start enumerating the batches', type = int, default = 0)
+def say(
+    text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str,
+    drop_text: bool, batch_size: int, ssml: bool = False, first_batch_index: int = 0
+):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
@@ -93,7 +97,7 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
             # print(destination)
             # raise ValueError('Destination name is required when splitting output file')
 
-        n_chunks = math.ceil(len(text) / batch_size)
+        n_chunks = first_batch_index + math.ceil(len(text) / batch_size)
 
         # val = input(f'There will be {n_chunks} chunks, ok? (y/N): ')
 
@@ -118,7 +122,9 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
     elif destination is None:
         destination = 'assets/speech.mp3'
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size)
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
+        text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index
+    )
 
 
 @main.command()

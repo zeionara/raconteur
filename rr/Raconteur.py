@@ -21,8 +21,8 @@ class Raconteur(ABC):
 
         self.splitter = splitter
 
-    def speak(self, text: str, filename: str = None, pbar: bool = False, save_text: str = True, accumulator = None, batch_size: int = None):
-        audio = self._say(text, pbar = pbar, accumulator = accumulator, batch_size = batch_size, path_template = filename)
+    def speak(self, text: str, filename: str = None, pbar: bool = False, save_text: str = True, accumulator = None, batch_size: int = None, first_batch_index: int = 0):
+        audio = self._say(text, pbar = pbar, accumulator = accumulator, batch_size = batch_size, path_template = filename, first_batch_index = first_batch_index)
 
         if accumulator is None and audio is not None:
             self.save(audio, filename, text if save_text else None)
@@ -70,7 +70,7 @@ class Raconteur(ABC):
     def set_file_meta(self, file):
         pass
 
-    def _say(self, text: str, pbar: bool = False, accumulator = None, batch_size: int = None, path_template: str = None):
+    def _say(self, text: str, pbar: bool = False, accumulator = None, batch_size: int = None, path_template: str = None, first_batch_index: int = 0):
         if batch_size is None:
             combined = np.array([], dtype = self.dtype) if accumulator is None else accumulator
 
@@ -84,39 +84,39 @@ class Raconteur(ABC):
                 combined = np.concatenate((combined, self.predict(chunk)))
 
             return combined
-        else:
-            assert accumulator is None, 'Accumulator must be none in a multibatch setting'
-            assert path_template is not None, 'Path template is required in a multibatch setting'
 
-            combined = np.array([], dtype = self.dtype)
+        assert accumulator is None, 'Accumulator must be none in a multibatch setting'
+        assert path_template is not None, 'Path template is required in a multibatch setting'
 
-            items = self.splitter.split(text)
-            chunks = tqdm(items) if pbar else items
+        combined = np.array([], dtype = self.dtype)
+
+        items = self.splitter.split(text)
+        chunks = tqdm(items) if pbar else items
+
+        batch_length = 0
+        batch_index = first_batch_index
+
+        def save():
+            nonlocal batch_length, combined, batch_index
+
+            self.save(combined, path_template.format(batch = batch_index), text = f'{batch_index:02d}')
 
             batch_length = 0
-            batch_index = 0
+            combined = np.array([], dtype = self.dtype)
+            batch_index += 1
 
-            def save():
-                nonlocal batch_length, combined, batch_index
+        for chunk in chunks:
+            # print(text)
+            # print(chunk, len(chunk))
 
-                self.save(combined, path_template.format(batch = batch_index), text = f'{batch_index:02d}')
+            combined = np.concatenate((combined, self.predict(chunk)))
 
-                batch_length = 0
-                combined = np.array([], dtype = self.dtype)
-                batch_index += 1
+            batch_length += len(chunk)
 
-            for chunk in chunks:
-                # print(text)
-                # print(chunk, len(chunk))
-
-                combined = np.concatenate((combined, self.predict(chunk)))
-
-                batch_length += len(chunk)
-
-                if batch_length >= batch_size:
-                    save()
-
-            if combined.shape[0] > 0:
+            if batch_length >= batch_size:
                 save()
 
-            return None
+        if combined.shape[0] > 0:
+            save()
+
+        return None
