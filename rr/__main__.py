@@ -22,7 +22,7 @@ from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read
+from .util import one_is_not_none, read  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
 
 
@@ -81,9 +81,10 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
 @option('--ssml', '-m', help = 'does input text contain ssml tags', is_flag = True)
 @option('--first-batch-index', '-f', help = 'in a multibatch setting from what number to start enumerating the batches', type = int, default = 0)
+@option('--update', '-u', help = 'update existing files instead of generating new ones', is_flag = True)
 def say(
     text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str,
-    drop_text: bool, batch_size: int, ssml: bool = False, first_batch_index: int = 0
+    drop_text: bool, batch_size: int, ssml: bool = False, first_batch_index: int = 0, update: bool = True
 ):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
@@ -110,7 +111,9 @@ def say(
         stem = Path(destination).stem
         batch_index_max_length = len(str(n_chunks))
         # template = "f'" + path.join(destination, f'{stem}-{{batch:0{batch_index_max_length}d}}.mp3') + "'"
-        template = path.join(destination, f'{stem}-{{batch:0{batch_index_max_length}d}}.mp3')
+
+        title = f'{stem}-{{batch:0{batch_index_max_length}d}}'
+        template = path.join(destination, f'{title}.mp3')
 
         destination = template
 
@@ -123,7 +126,7 @@ def say(
         destination = 'assets/speech.mp3'
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
-        text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index
+        text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index, title = title, update = update
     )
 
 
