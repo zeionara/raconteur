@@ -111,29 +111,31 @@ class Raconteur(ABC):
         batch_length = 0
         batch_index = first_batch_index
         text = ''
+        path = path_template.format(batch = batch_index)
 
         def save():
-            nonlocal batch_length, combined, batch_index, text
+            nonlocal batch_length, combined, batch_index, text, path
 
             if update:
-                self.update(path_template.format(batch = batch_index), drop_empty_lines(text), title = title.format(batch = batch_index))
+                self.update(path, drop_empty_lines(text), title = title.format(batch = batch_index))
                 # self.update(path_template.format(batch = batch_index), drop_empty_lines(drop_accent_marks(text)), title.format(batch = batch_index))
                 # self.update(path_template.format(batch = batch_index), drop_empty_lines(drop_accent_marks(text)), f'{batch_index:02d}')
-            else:
+            elif not os.path.isfile(path):
                 # self.save(combined, path_template.format(batch = batch_index), drop_empty_lines(drop_accent_marks(text)), title = title.format(batch = batch_index))
-                self.save(combined, path_template.format(batch = batch_index), drop_empty_lines(text), title = title.format(batch = batch_index))
+                self.save(combined, path, drop_empty_lines(text), title = title.format(batch = batch_index))
 
             batch_length = 0
             combined = np.array([], dtype = self.dtype)
             batch_index += 1
             text = ''
+            path = path_template.format(batch = batch_index)
 
         for chunk in chunks:
             # print(text)
             # print(chunk, len(chunk))
 
             text = f'{text} {chunk}'
-            if not update:
+            if not update and not os.path.isfile(path):
                 combined = np.concatenate((combined, self.predict(chunk)))
 
             batch_length += len(chunk)
