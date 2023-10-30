@@ -9,17 +9,28 @@ class Coqui(Raconteur):
     name = 'coqui'
 
     def __init__(self, speaker_wav: str, model: str = 'tts_models/multilingual/multi-dataset/xtts_v1', gpu: bool = True, ru: bool = True, *args, **kwargs):
+        # model = 'tts_models/en/ek1/tacotron2'
+
         self.model = model
         self.gpu = gpu
         self.speaker_wav = speaker_wav
         self.ru = ru
 
-        self.tts = TTS(model).to('cpu')  # to('cuda') causes out of memory error
+        # print(TTS().list_models())
+        # print('--', model)
+
+        model = TTS(model)
+
+        if gpu:
+            self.tts = model.to('cuda')
+        else:
+            self.tts = model.to('cpu')  # to('cuda') causes out of memory error
 
         super().__init__(*args, **kwargs)
 
     def predict(self, text: str):
         data = self.tts.tts(
+        # data = TTS(self.model).to('cuda').tts(
             text = text,
             speaker_wav = self.speaker_wav,
             language = 'ru' if self.ru else 'en'

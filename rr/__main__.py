@@ -124,6 +124,7 @@ def say(
 
     elif destination is None:
         destination = 'assets/speech.mp3'
+        title = None
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
         text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index, title = title, update = update

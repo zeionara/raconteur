@@ -27,7 +27,7 @@ class RaconteurFactory:
                 )
             case Bark.name:
                 return Bark(
-                    artist = 'v2/ru_speaker_6' if self.ru else 'v2/en_speaker_6',
+                    artist = artist if artist is not None else 'v2/ru_speaker_6' if self.ru else 'v2/en_speaker_6',
                     splitter = Splitter(200 if max_n_characters is None else max_n_characters)
                 )
             case RuTTS.name:
@@ -48,16 +48,18 @@ class RaconteurFactory:
                 )
             case Coqui.name:
                 return Coqui(
-                    speaker_wav = 'assets/female.wav',
+                    speaker_wav = f'assets/{"female" if artist is None else artist}.wav',
                     gpu = self.gpu,
                     ru = self.ru,
-                    splitter = Splitter(200 if max_n_characters is None else max_n_characters)
+                    splitter = Splitter(1000 if max_n_characters is None else max_n_characters)
                 )
             case Silero.name:
                 return Silero(
                     model = 'v4' if self.ru else 'v3',
                     gpu = self.gpu,
-                    artist = ('xenia' if self.ru else 'en_1') if artist is None else artist,
+                    # artist = ('xenia' if self.ru else 'en_12') if artist is None else artist,
+                    # artist = ('xenia' if self.ru else 'en_21') if artist is None else artist,
+                    artist = ('xenia' if self.ru else 'en_26') if artist is None else artist,
                     ru = self.ru,
                     splitter = Splitter(400 if max_n_characters is None else max_n_characters),
                     ssml = ssml
