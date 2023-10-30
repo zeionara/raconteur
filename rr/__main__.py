@@ -1,11 +1,15 @@
-from os import path, makedirs
+from os import path, makedirs, listdir
 from time import time
 import math
 from pathlib import Path
+from math import ceil, floor
+import subprocess
 
 from click import group, argument, option, Choice
 from pandas import read_csv
 import numpy as np
+from pydub import AudioSegment
+from music_tag import load_file
 
 # from beep import beep
 # from cloud_mail_api import CloudMail
@@ -22,16 +26,69 @@ from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read  # , drop_accent_marks, drop_empty_lines
+from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
 
 
 ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+OVERLAY = (
+    'ffmpeg -y -i {input} -i {background} '
+    '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
+    '-map_metadata 0 -metadata TDOR="2023" -metadata date="2023" {output}'
+)
+N_MILLISECONDS_IN_SECOND = 1000
 
 
 @group()
 def main():
     pass
+
+
+@main.command()
+@argument('source', type = str)
+@argument('background', type = str)
+@argument('destination', type = str)
+@option('--volume', '-v', type = float, default = 0.2)
+def overlay(source: str, background: str, destination: str, volume: float):
+    offset = 0
+    background_length = floor(len(AudioSegment.from_mp3(background)) / N_MILLISECONDS_IN_SECOND)
+
+    if not path.isdir(destination):
+        makedirs(destination)
+
+    for filename in tqdm(sorted(listdir(source))):
+        file = path.join(source, filename)
+
+        if is_audio(file):
+            source_meta = load_file(file)
+            file_length = ceil(len(AudioSegment.from_mp3(file)) / N_MILLISECONDS_IN_SECOND)
+
+            if offset + file_length > background_length:
+                offset = 0
+
+            overlay_ = OVERLAY.format(
+                input = file,
+                background = background,
+                offset = offset,
+                volume = volume,
+                output = (destination_file := path.join(destination, filename))
+            )
+
+            subprocess.call(overlay_, shell = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+            # subprocess.call(overlay_, shell = True)
+
+            destination_meta = load_file(destination_file)
+
+            destination_meta['lyrics'] = source_meta['lyrics']
+            destination_meta['comment'] = source_meta['comment']
+            # destination_meta['album'] = source_meta['album']
+
+            destination_meta.save()
+
+            if offset > 0:
+                break
+
+            offset += file_length
 
 
 @main.command()

@@ -35,6 +35,16 @@ Currently the following engines are supported:
 
 For a full list of available cli options see [`__main__.py`][2].
 
+### Add background music to speech
+
+To add background music to speech use `overlay` command:
+
+```sh
+python -m rr overlay "$HOME/Music/sayonara" "$HOME/Downloads/jap.mp3" "$HOME/Music/sayonara-overlay"
+```
+
+here option `-v` (`--volume`) can be used to adjust volume of the background music. The default value is 0.2.
+
 ### Convert anecdotes to voice
 
 The app natively supports one specific use-case: it allows to synthesize speech for anecdotes from [this kaggle dataset](https://www.kaggle.com/datasets/zeionara/anecdotes?select=anecdotes.tsv). The command is similar to the examples listed above, to use `rutts` model for reading aloud the first 10 anecdotes you can just type:
