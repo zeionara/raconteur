@@ -85,9 +85,6 @@ def overlay(source: str, background: str, destination: str, volume: float):
 
             destination_meta.save()
 
-            if offset > 0:
-                break
-
             offset += file_length
 
 
