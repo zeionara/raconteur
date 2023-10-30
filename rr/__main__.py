@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 from math import ceil, floor
 import subprocess
+from multiprocessing import Pool, set_start_method  # , Lock
+from functools import partial
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -28,6 +30,8 @@ from .RaconteurFactory import RaconteurFactory
 
 from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
+
+from .alternator import _alternate, _alternate_pool_wrapper
 
 
 ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
@@ -88,38 +92,50 @@ def overlay(source: str, background: str, destination: str, volume: float):
             offset += file_length
 
 
+if __name__ == '__main__':
+    set_start_method('spawn', force = True)
+
+
+@main.command()
+@argument('texts', type = str)
+@argument('output_path', type = str)
+@option('--artist-one', '-a1', help = 'ifrst artist to say the replic', default = 'xenia')
+@option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
+@option('--n-workers', '-w', help = 'how many processes to deploy for mapping the objects', default = 4)
+def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_workers: int):
+    # lock = Lock()
+
+    def generate_samples():
+        for file in listdir(texts):
+            input_file = path.join(texts, file)
+            output_file = path.join(output_path, f'{path.splitext(file)[0]}.mp3')
+
+            if path.isfile(output_file):
+                continue
+
+            yield (input_file, output_file)
+
+    items = tuple(generate_samples())
+
+    # pbar = tqdm(total = len(items))
+
+    # apply = partial(_alternate_pool_wrapper, artist_one = artist_one, artist_two = artist_two, pbar = pbar, lock = lock)
+    apply = partial(_alternate_pool_wrapper, artist_one = artist_one, artist_two = artist_two)
+
+    with Pool(processes = n_workers) as pool:
+        pool.map(apply, items)
+
+    # for inp, outp in generate_samples():
+    #     print(inp, outp)
+    #     return
+
+
 @main.command()
 @argument('text', type = str)  # file must be in a format exported by much module: see https://github.com/zeionara/much
 @option('--artist-one', '-a1', help = 'first artist to say the replic', default = 'xenia')
 @option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
 def alternate(text: str, artist_one: str, artist_two: str):
-    assert artist_one != artist_two, 'The two artist must not be same'
-
-    output_path = f'{path.splitext(text)[0]}.mp3'
-
-    factory = RaconteurFactory(gpu = True, ru = True)
-
-    a1 = factory.make(engine = 'silero', artist = artist_one)
-    a2 = factory.make(engine = 'silero', artist = artist_two)
-
-    a1_speaks = True
-
-    accumulator = np.array([], dtype = 'float32')
-
-    with open(text, 'r') as file:
-        lines = file.read().split('\n')
-
-    pbar = tqdm(total = len(lines))
-
-    for line in lines:
-        if line:
-            # You can't create two objects for the artist and reuse them - in this case the program hangs after the first iteration
-            accumulator = (a1 if a1_speaks else a2).speak(line, save_text = False, accumulator = accumulator)
-            a1_speaks = not a1_speaks
-
-        pbar.update()
-
-    a1.save(accumulator, filename = output_path)
+    _alternate(text, artist_one, artist_two)
 
 
 @main.command()
