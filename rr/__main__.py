@@ -92,10 +92,6 @@ def overlay(source: str, background: str, destination: str, volume: float):
             offset += file_length
 
 
-if __name__ == '__main__':
-    set_start_method('spawn', force = True)
-
-
 @main.command()
 @argument('texts', type = str)
 @argument('output_path', type = str)
@@ -103,7 +99,7 @@ if __name__ == '__main__':
 @option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
 @option('--n-workers', '-w', help = 'how many processes to deploy for mapping the objects', default = 4)
 def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_workers: int):
-    # lock = Lock()
+    set_start_method('spawn', force = True)
 
     def generate_samples():
         for file in listdir(texts):

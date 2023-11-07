@@ -46,7 +46,7 @@ class Raconteur(ABC):
 
         self.update(filename, text, title)
 
-        return Audio(audio, rate = self.sample_rate)
+        return None if audio.size < 1 else Audio(audio, rate = self.sample_rate)
 
     def update(self, filename: str, text: str = None, title: str = None):
         file = load_file(filename)
@@ -95,7 +95,14 @@ class Raconteur(ABC):
                 # print(text)
                 # print(chunk, len(chunk))
 
-                combined = np.concatenate((combined, self.predict(chunk)))
+                try:
+                    predictions = self.predict(chunk)
+                # except ValueError:
+                except:
+                    print(f'Cannot generate speech for text "{chunk}". Setting predictions to an empty array')
+                    predictions = np.array([], dtype = self.dtype)
+
+                combined = np.concatenate((combined, predictions))
 
             return combined
 
