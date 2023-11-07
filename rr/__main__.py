@@ -98,7 +98,8 @@ def overlay(source: str, background: str, destination: str, volume: float):
 @option('--artist-one', '-a1', help = 'ifrst artist to say the replic', default = 'xenia')
 @option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
 @option('--n-workers', '-w', help = 'how many processes to deploy for mapping the objects', default = 4)
-def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_workers: int):
+@option('--limit', '-l', type = int, help = 'how many files to process in total', default = None)
+def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_workers: int, limit: int):
     set_start_method('spawn', force = True)
 
     def generate_samples():
@@ -112,6 +113,11 @@ def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_wo
             yield (input_file, output_file)
 
     items = tuple(generate_samples())
+
+    if limit is not None:
+        items = items[:limit]
+
+    print(f'Processing {len(items)} items...')
 
     # pbar = tqdm(total = len(items))
 

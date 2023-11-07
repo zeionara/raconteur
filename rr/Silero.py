@@ -58,7 +58,7 @@ class Silero(Raconteur):
 
         model.to(self.device)
 
-        text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        # text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
 
         if ssml := self.ssml:
             # text_with_tags = self.accentizer.process_all(text)
@@ -103,3 +103,6 @@ class Silero(Raconteur):
 
     def set_file_meta(self, file):
         file['artist'] = self.artist
+
+    def preprocess(self, text: str):
+        return translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)

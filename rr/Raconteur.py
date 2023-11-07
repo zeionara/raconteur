@@ -81,6 +81,9 @@ class Raconteur(ABC):
     def set_file_meta(self, file):
         pass
 
+    def preprocess(self, text: str):
+        return text
+
     def _say(
         self, text: str, pbar: bool = False, accumulator = None, batch_size: int = None, path_template: str = None, first_batch_index: int = 0, title: str = None,
         update: bool = True
@@ -88,7 +91,7 @@ class Raconteur(ABC):
         if batch_size is None:
             combined = np.array([], dtype = self.dtype) if accumulator is None else accumulator
 
-            items = self.splitter.split(text)
+            items = self.splitter.split(self.preprocess(text))
             chunks = tqdm(items) if pbar else items
 
             for chunk in chunks:

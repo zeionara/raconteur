@@ -14,6 +14,8 @@ class Splitter:
         if len(text) < 1:
             return ('', )
 
+        # print(f'Split text ({self.max_n_characters}):', text)
+
         max_n_characters = self.max_n_characters
 
         chunks = []
@@ -125,5 +127,7 @@ class Splitter:
             # increment()
 
         reset()
+
+        # print([len(item) for item in chunks])
 
         return tuple(chunks)
