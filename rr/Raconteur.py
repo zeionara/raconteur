@@ -102,6 +102,8 @@ class Raconteur(ABC):
                 try:
                     predictions = self.predict(chunk)
                 # except ValueError:
+                except OSError:
+                    raise
                 except:
                     print(format_exc())
                     print(f'Cannot generate speech for text "{chunk}". Setting predictions to an empty array')
