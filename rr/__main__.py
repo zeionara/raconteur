@@ -194,8 +194,9 @@ def say(
 
         # print(template.format(batch = 8))
 
-    elif destination is None:
-        destination = 'assets/speech.mp3'
+    else:
+        if destination is None:
+            destination = 'assets/speech.mp3'
         title = None
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(

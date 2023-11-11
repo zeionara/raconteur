@@ -1,4 +1,4 @@
-from os import path
+from os import path, remove
 
 import numpy as np
 from tqdm import tqdm
@@ -43,6 +43,7 @@ def _alternate_pool_wrapper(args: [str], artist_one: str, artist_two: str):
     _alternate(args[0], artist_one, artist_two, args[1], quiet = True)
 
     print('+1')
+    remove(args[0]) # delete txt file with source text
 
     # with lock:
     #     pbar.update()

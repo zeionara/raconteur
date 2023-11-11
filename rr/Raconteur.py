@@ -1,6 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from uuid import uuid4
+from traceback import format_exc
 
 from scipy.io.wavfile import write as write_wav
 import numpy as np
@@ -102,6 +103,7 @@ class Raconteur(ABC):
                     predictions = self.predict(chunk)
                 # except ValueError:
                 except:
+                    print(format_exc())
                     print(f'Cannot generate speech for text "{chunk}". Setting predictions to an empty array')
                     predictions = np.array([], dtype = self.dtype)
 
