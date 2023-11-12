@@ -19,11 +19,11 @@ from music_tag import load_file
 from tqdm import tqdm
 # import torch
 
-from .Bark import Bark
-from .RuTTS import RuTTS
+# from .Bark import Bark
+# from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
-from .Coqui import Coqui
+# from .Coqui import Coqui
 from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
@@ -34,7 +34,8 @@ from .SpeechIndex import SpeechIndex
 from .alternator import _alternate, _alternate_pool_wrapper
 
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+# ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
@@ -144,7 +145,7 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @argument('text', type = str, required = False)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Silero.name)
 @option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = None)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
@@ -197,6 +198,10 @@ def say(
     else:
         if destination is None:
             destination = 'assets/speech.mp3'
+
+        if not path.isdir('assets'):
+            makedirs('assets')
+
         title = None
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
@@ -211,7 +216,7 @@ def say(
 @option('--top-n', '-n', help = 'number of entries to handle', type = int, default = None)
 @option('--offset', '-o', help = 'number of entries in the beginning to skip', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Silero.name)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--skip-if-exists', '-k', help = 'skip anek if audio file with the same name already exists', is_flag = True)
 @option('--username', '-u', help = 'cloud mail ru username', type = str)
