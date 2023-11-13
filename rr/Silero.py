@@ -32,12 +32,15 @@ class Silero(Raconteur):
         # self.accentizer = accentizer = RUAccent(workdir = ACCENTIZER_MODEL_PATH)
         # accentizer.load()
 
-        # model, _ = torch.hub.load(
-        #     repo_or_dir = REPO,
-        #     model = MODEL,
-        #     language = 'ru' if ru else 'en',
-        #     speaker = f'{model}_{language}'
-        # )
+        model, _ = torch.hub.load(
+            repo_or_dir = REPO,
+            model = MODEL,
+            language = 'ru' if ru else 'en',
+            speaker = f'{model}_{self.language}'
+        )
+        model.to(self.device)
+
+        self._model = model
 
         # self.model = model
 
@@ -49,14 +52,15 @@ class Silero(Raconteur):
         #     speaker = self.artist,
         #     sample_rate = self.sample_rate
         # )
-        model, _ = torch.hub.load(
-            repo_or_dir = REPO,
-            model = MODEL,
-            language = self.language,
-            speaker = f'{self.model}_{self.language}'
-        )
 
-        model.to(self.device)
+        # model, _ = torch.hub.load(
+        #     repo_or_dir = REPO,
+        #     model = MODEL,
+        #     language = self.language,
+        #     speaker = f'{self.model}_{self.language}'
+        # )
+
+        # model.to(self.device)
 
         # text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
 
@@ -73,7 +77,7 @@ class Silero(Raconteur):
         #     print(text_with_tags)
 
         try:
-            data = model.apply_tts(
+            data = self._model.apply_tts(
                 text = None if ssml else text,
                 ssml_text = text_with_tags if ssml else None,
                 # text = text,

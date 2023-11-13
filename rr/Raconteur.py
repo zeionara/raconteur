@@ -102,7 +102,7 @@ class Raconteur(ABC):
                 try:
                     predictions = self.predict(chunk)
                 # except ValueError:
-                except OSError:
+                except (OSError, KeyboardInterrupt):
                     raise
                 except:
                     print(format_exc())
