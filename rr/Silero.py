@@ -109,4 +109,7 @@ class Silero(Raconteur):
         file['artist'] = self.artist
 
     def preprocess(self, text: str):
-        return translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        try:
+            return translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        except KeyError:
+            return translit(text, 'ru') if self.language == 'ru' else text
