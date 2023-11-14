@@ -35,7 +35,11 @@ def _alternate(text: str, artist_one: str, artist_two: str, output_path: str = N
         if not quiet:
             pbar.update()
 
-    a1.save(accumulator, filename = output_path)
+    try:
+        a1.save(accumulator, filename = output_path)
+    except ValueError:
+        print(f'Can\'t save file {output_path}')
+        raise
 
 
 # def _alternate_pool_wrapper(args: [str], artist_one: str, artist_two: str, pbar, lock: Lock):

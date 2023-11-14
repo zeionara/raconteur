@@ -1,6 +1,7 @@
 import torch
 
 from transliterate import translit
+from numpy import float32, int16, max as np_max, abs as np_abs
 # from ruaccent import RUAccent
 
 from .Raconteur import Raconteur
@@ -104,6 +105,9 @@ class Silero(Raconteur):
     @property
     def dtype(self):
         return 'float32'
+
+    def to_int16(self, data: float32):
+        return (data / np_max(np_abs(data)) * 32767).astype(int16)
 
     def set_file_meta(self, file):
         file['artist'] = self.artist
