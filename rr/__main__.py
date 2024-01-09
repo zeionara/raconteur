@@ -96,6 +96,7 @@ def start(assets: str):
             thread_id = int(thread_id)
         except ValueError:
             await user.send_message(f'Unsupported thread id: {thread_id}')
+            return
         else:
             await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
