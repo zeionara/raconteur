@@ -21,7 +21,9 @@ from tqdm import tqdm
 # import torch
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
 from much import Fetcher, Exporter, Format, normalize
+from karma import CloudMail
 
 # from .Bark import Bark
 # from .RuTTS import RuTTS
@@ -50,6 +52,9 @@ N_MILLISECONDS_IN_SECOND = 1000
 TELEGRAM_TOKEN_ENV = 'RACONTEUR_BOT_TOKEN'
 CHAT_ID_ENV = 'MY_CHAT_ID'
 
+KARMA_USERNAME_ENV = 'KARMA_USERNAME'
+KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
+
 
 @group()
 def main():
@@ -58,9 +63,22 @@ def main():
 
 @main.command()
 @argument('assets', type = str, default = '/tmp')
-def start(assets: str):
+@option('--cloud', '-c', help = 'path to remote folder in mail ru cloud for uploading generated audio files', type = str, default = None)
+def start(assets: str, cloud: str):
     token = env.get(TELEGRAM_TOKEN_ENV)
     chat_id = env.get(CHAT_ID_ENV)
+
+    if cloud is not None:
+        karma_username = env.get(KARMA_USERNAME_ENV)
+        karma_password = env.get(KARMA_PASSWORD_ENV)
+
+        if karma_username is None or karma_password is None:
+            raise ValueError(f'Environment variables {KARMA_USERNAME_ENV} and {KARMA_PASSWORD_ENV} must be set')
+
+        uploader = CloudMail(karma_username, karma_password)
+        uploader.auth()
+    else:
+        uploader = None
 
     if not path.isdir(assets):
         makedirs(assets)
@@ -133,6 +151,12 @@ def start(assets: str):
 
             with open(audio_path, 'rb') as audio_file:
                 await user.send_audio(audio_file, title = thread_title)
+
+                if uploader is not None:
+                    response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
+
+                    print('File uploading result:')
+                    print(response)
 
     bot = ApplicationBuilder().token(token).build()
     bot.add_handler(CommandHandler('speak', _speak))
