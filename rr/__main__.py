@@ -86,11 +86,16 @@ def start(assets: str):
         parts = normalize(message.replace('/speak', '').strip()).split(' ', maxsplit = 1)
 
         thread_id = parts[0]
+        url = None
 
         if len(parts) > 1:
             thread_title = parts[1]
         else:
             thread_title = None
+
+        if thread_id.startswith('http'):
+            url = thread_id
+            thread_id = Path(url).stem
 
         try:
             thread_id = int(thread_id)
@@ -100,10 +105,13 @@ def start(assets: str):
         else:
             await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
-        url = f'https://2ch.hk/b/res/{thread_id}.html'
+        if url is None:
+            url = f'https://2ch.hk/b/res/{thread_id}.html'
 
-        text_path = path.join(assets, f'{thread_id}.txt')
-        audio_path = path.join(assets, f'{thread_id}.mp3')
+        filename = thread_id if thread_title is None else thread_title.lower().replace(' ', '-')
+
+        text_path = path.join(assets, f'{filename}.txt')
+        audio_path = path.join(assets, f'{filename}.mp3')
 
         if not path.isfile(text_path):
             print(f'Pulling url {url}...')
