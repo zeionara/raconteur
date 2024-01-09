@@ -1,4 +1,4 @@
-from os import path, makedirs, listdir
+from os import path, makedirs, listdir, environ as env, stat
 from time import time
 import math
 from pathlib import Path
@@ -6,6 +6,7 @@ from math import ceil, floor
 import subprocess
 from multiprocessing import Pool, set_start_method  # , Lock
 from functools import partial
+from traceback import format_exc
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -18,6 +19,9 @@ from music_tag import load_file
 # from fuck import ProfanityHandler
 from tqdm import tqdm
 # import torch
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from much import Fetcher, Exporter, Format, normalize
 
 # from .Bark import Bark
 # from .RuTTS import RuTTS
@@ -43,10 +47,89 @@ OVERLAY = (
 )
 N_MILLISECONDS_IN_SECOND = 1000
 
+TELEGRAM_TOKEN_ENV = 'RACONTEUR_BOT_TOKEN'
+CHAT_ID_ENV = 'MY_CHAT_ID'
+
 
 @group()
 def main():
     pass
+
+
+@main.command()
+@argument('assets', type = str, default = '/tmp')
+def start(assets: str):
+    token = env.get(TELEGRAM_TOKEN_ENV)
+    chat_id = env.get(CHAT_ID_ENV)
+
+    if not path.isdir(assets):
+        makedirs(assets)
+
+    fetcher = Fetcher()
+    exporter = Exporter()
+
+    if token is None:
+        raise ValueError(f'Environment variable {TELEGRAM_TOKEN_ENV} must be defined')
+
+    if chat_id is None:
+        raise ValueError(f'Environment variable {CHAT_ID_ENV} must be defined')
+    else:
+        chat_id = int(chat_id)
+
+    async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        message = update.message.text
+        parts = normalize(message.replace('/speak', '').strip()).split(' ', maxsplit = 1)
+
+        thread_id = parts[0]
+
+        if len(parts) > 1:
+            thread_title = parts[1]
+        else:
+            thread_title = None
+
+        try:
+            thread_id = int(thread_id)
+        except ValueError:
+            await user.send_message(f'Unsupported thread id: {thread_id}')
+        else:
+            await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
+
+        url = f'https://2ch.hk/b/res/{thread_id}.html'
+
+        text_path = path.join(assets, f'{thread_id}.txt')
+        audio_path = path.join(assets, f'{thread_id}.mp3')
+
+        if not path.isfile(text_path):
+            print(f'Pulling url {url}...')
+
+            exporter.export(fetcher.fetch(url), Format.TXT, text_path)
+
+            print(f'Pulled {url} to {text_path}. Generating speech...')
+
+        if stat(text_path).st_size == 0:
+            await user.send_message(f'Thread {thread_id} does not exist')
+        else:
+            if not path.isfile(audio_path):
+                try:
+                    # raise ValueError('test')
+                    _alternate(text_path, artist_one = 'xenia', artist_two = 'baya')
+                except:
+                    await user.send_message(f'There was an internal error:\n\n```{format_exc()}```\nPlease try again', parse_mode = 'Markdown')
+                    return
+
+            with open(audio_path, 'rb') as audio_file:
+                await user.send_audio(audio_file, title = thread_title)
+
+    bot = ApplicationBuilder().token(token).build()
+    bot.add_handler(CommandHandler('speak', _speak))
+
+    print('Started telegram bot')
+    bot.run_polling()
 
 
 @main.command()

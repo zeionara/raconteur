@@ -21,4 +21,4 @@ conda create --name raconteur python=3.11.5
 conda activate raconteur
 
 conda install click pandas numpy tqdm scipy ipython requests pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch-nightly -c nvidia
-pip install music-tag pydub num2words transliterate omegaconf
+pip install music-tag pydub num2words transliterate omegaconf python-telegram-bot beautifulsoup4
