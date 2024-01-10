@@ -54,6 +54,7 @@ CHAT_ID_ENV = 'MY_CHAT_ID'
 
 KARMA_USERNAME_ENV = 'KARMA_USERNAME'
 KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
+KARMA_AUTH_TIMEOUT = 1800  # seconds
 
 
 @group()
@@ -77,8 +78,10 @@ def start(assets: str, cloud: str):
 
         uploader = CloudMail(karma_username, karma_password)
         uploader.auth()
+        last_auth_timestamp = time()
     else:
         uploader = None
+        last_auth_timestamp = None  # time()
 
     if not path.isdir(assets):
         makedirs(assets)
@@ -95,13 +98,15 @@ def start(assets: str, cloud: str):
         chat_id = int(chat_id)
 
     async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        nonlocal last_auth_timestamp
+
         user = update.effective_user
 
         if user.id != chat_id:
             return
 
         message = update.message.text
-        parts = normalize(message.replace('/speak', '').strip()).split(' ', maxsplit = 1)
+        parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
 
         thread_id = parts[0]
         url = None
@@ -152,14 +157,24 @@ def start(assets: str, cloud: str):
             with open(audio_path, 'rb') as audio_file:
                 await user.send_audio(audio_file, title = thread_title)
 
+                # print(time() - last_auth_timestamp)
+
                 if uploader is not None:
+                    if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
+                        uploader.auth()
+                        last_auth_timestamp = current_time
+
                     response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
 
                     print('File uploading result:')
                     print(response)
 
+                    if response['status'] != 200:
+                        await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
+
     bot = ApplicationBuilder().token(token).build()
-    bot.add_handler(CommandHandler('speak', _speak))
+    # bot.add_handler(CommandHandler('speak', _speak))
+    bot.add_handler(CommandHandler('s', _speak))
 
     print('Started telegram bot')
     bot.run_polling()
