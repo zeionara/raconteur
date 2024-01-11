@@ -1,3 +1,4 @@
+# import re
 from os import path, makedirs, listdir, environ as env, stat
 from time import time
 import math
@@ -20,7 +21,7 @@ from music_tag import load_file
 from tqdm import tqdm
 # import torch
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 from much import Fetcher, Exporter, Format, normalize
 from karma import CloudMail
@@ -106,7 +107,8 @@ def start(assets: str, cloud: str):
             return
 
         message = update.message.text
-        parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
+        # parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
+        parts = normalize(message.strip()).split(' ', maxsplit = 1)
 
         thread_id = parts[0]
         url = None
@@ -173,8 +175,12 @@ def start(assets: str, cloud: str):
                         await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
 
     bot = ApplicationBuilder().token(token).build()
+
     # bot.add_handler(CommandHandler('speak', _speak))
-    bot.add_handler(CommandHandler('s', _speak))
+    # bot.add_handler(CommandHandler('s', _speak))
+    # bot.add_handler(MessageHandler(filters.Regex(re.compile('http.+', re.IGNORECASE)), _speak))
+
+    bot.add_handler(MessageHandler(filters.ALL, _speak))
 
     print('Started telegram bot')
     bot.run_polling()
