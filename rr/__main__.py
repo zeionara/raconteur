@@ -1,6 +1,7 @@
 # import re
 from os import path, makedirs, listdir, environ as env, stat
-from time import time
+import asyncio
+from time import time, sleep
 import math
 from pathlib import Path
 from math import ceil, floor
@@ -22,7 +23,7 @@ from tqdm import tqdm
 # import torch
 from telegram import Update
 from telegram.error import NetworkError
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults
 
 from much import Fetcher, Exporter, Format, normalize
 from karma import CloudMail
@@ -100,6 +101,14 @@ def start(assets: str, cloud: str):
         chat_id = int(chat_id)
 
     async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        # await update.effective_user.send_message(f'Started handling message {update.message.text}')
+        # # print(f'Started handling message {update.message.text}')
+
+        # await asyncio.sleep(5)
+
+        # # await update.effective_user.send_message(f'Stopped handling message {update.message.text}')
+        # print(f'Stopped handling message {update.message.text}')
+
         nonlocal last_auth_timestamp
 
         user = update.effective_user
@@ -128,8 +137,8 @@ def start(assets: str, cloud: str):
         except ValueError:
             await user.send_message(f'Unsupported thread id: {thread_id}')
             return
-        else:
-            await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
+
+        await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
         if url is None:
             url = f'https://2ch.hk/b/res/{thread_id}.html'
@@ -152,7 +161,7 @@ def start(assets: str, cloud: str):
             if not path.isfile(audio_path):
                 try:
                     # raise ValueError('test')
-                    _alternate(text_path, artist_one = 'xenia', artist_two = 'baya')
+                    await asyncio.get_event_loop().run_in_executor(None, lambda: _alternate(text_path, artist_one = 'xenia', artist_two = 'baya'))
                 except:
                     await user.send_message(f'There was an internal error:\n\n```{format_exc()}```\nPlease try again', parse_mode = 'Markdown')
                     return
@@ -161,7 +170,7 @@ def start(assets: str, cloud: str):
                 try:
                     await user.send_audio(audio_file, title = thread_title)
                 except NetworkError:
-                    await user.send_message("Can't send file `${audio_path}` due to a network error:\n\n```{format_exc()}```\nPlease try again", parse_mode = 'Markdown')
+                    await user.send_message(f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()}```\nPlease try again", parse_mode = 'Markdown')
 
             # print(time() - last_auth_timestamp)
 
@@ -178,7 +187,7 @@ def start(assets: str, cloud: str):
                 if response['status'] != 200:
                     await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
 
-    bot = ApplicationBuilder().token(token).build()
+    bot = ApplicationBuilder().token(token).defaults(Defaults(block = False)).build()
 
     # bot.add_handler(CommandHandler('speak', _speak))
     # bot.add_handler(CommandHandler('s', _speak))
