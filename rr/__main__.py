@@ -21,6 +21,7 @@ from music_tag import load_file
 from tqdm import tqdm
 # import torch
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 from much import Fetcher, Exporter, Format, normalize
@@ -157,22 +158,25 @@ def start(assets: str, cloud: str):
                     return
 
             with open(audio_path, 'rb') as audio_file:
-                await user.send_audio(audio_file, title = thread_title)
+                try:
+                    await user.send_audio(audio_file, title = thread_title)
+                except NetworkError:
+                    await user.send_message("Can't send file `${audio_path}` due to a network error:\n\n```{format_exc()}```\nPlease try again", parse_mode = 'Markdown')
 
-                # print(time() - last_auth_timestamp)
+            # print(time() - last_auth_timestamp)
 
-                if uploader is not None:
-                    if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
-                        uploader.auth()
-                        last_auth_timestamp = current_time
+            if uploader is not None:
+                if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
+                    uploader.auth()
+                    last_auth_timestamp = current_time
 
-                    response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
+                response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
 
-                    print('File uploading result:')
-                    print(response)
+                print('File uploading result:')
+                print(response)
 
-                    if response['status'] != 200:
-                        await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
+                if response['status'] != 200:
+                    await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
 
     bot = ApplicationBuilder().token(token).build()
 
