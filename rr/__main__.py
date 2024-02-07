@@ -9,6 +9,8 @@ import subprocess
 from multiprocessing import Pool, set_start_method  # , Lock
 from functools import partial
 from traceback import format_exc
+from warnings import filterwarnings
+from requests import get
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -21,9 +23,10 @@ from music_tag import load_file
 # from fuck import ProfanityHandler
 from tqdm import tqdm
 # import torch
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import NetworkError
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults, ConversationHandler, CallbackQueryHandler
+from telegram.warnings import PTBUserWarning
 
 from much import Fetcher, Exporter, Format, normalize
 from karma import CloudMail
@@ -41,6 +44,9 @@ from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_e
 from .SpeechIndex import SpeechIndex
 
 from .alternator import _alternate, _alternate_pool_wrapper
+from .Thread import Thread
+
+filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category = PTBUserWarning)
 
 
 # ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
@@ -59,6 +65,12 @@ KARMA_USERNAME_ENV = 'KARMA_USERNAME'
 KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
 KARMA_AUTH_TIMEOUT = 1800  # seconds
 
+CATALOG_URL = 'https://2ch.hk/b/catalog.json'
+N_TOP_THREADS = 10
+
+FILENAME = 'filename'
+BUTTON = 'button'
+
 
 @group()
 def main():
@@ -69,6 +81,17 @@ def main():
 @argument('assets', type = str, default = '/tmp')
 @option('--cloud', '-c', help = 'path to remote folder in mail ru cloud for uploading generated audio files', type = str, default = None)
 def start(assets: str, cloud: str):
+    # response = get(CATALOG_URL)
+
+    # if (status_code := response.status_code) != 200:
+    #     raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
+
+    # threads = sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)[:N_TOP_THREADS]
+    # for thread in threads:
+    #     print(thread)
+
+    # return
+
     token = env.get(TELEGRAM_TOKEN_ENV)
     chat_id = env.get(CHAT_ID_ENV)
 
@@ -100,43 +123,86 @@ def start(assets: str, cloud: str):
     else:
         chat_id = int(chat_id)
 
-    async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        # await update.effective_user.send_message(f'Started handling message {update.message.text}')
-        # # print(f'Started handling message {update.message.text}')
+    async def _top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
 
-        # await asyncio.sleep(5)
+        if user.id != chat_id:
+            return
 
-        # # await update.effective_user.send_message(f'Stopped handling message {update.message.text}')
-        # print(f'Stopped handling message {update.message.text}')
+        try:
+            top_n = int(update.message.text[::-1].split(' ', maxsplit = 1)[0][::-1])
+        except ValueError:
+            top_n = N_TOP_THREADS
 
-        nonlocal last_auth_timestamp
+        # keyboard = [
+        #     [
+        #         InlineKeyboardButton('Option 1', callback_data = '1'),
+        #         InlineKeyboardButton('Option 2', callback_data = '2')
+        #     ],
+        #     [
+        #         InlineKeyboardButton('Option 3', callback_data = '3')
+        #     ]
+        # ]
 
+        response = get(CATALOG_URL, timeout = 60)
+
+        if (status_code := response.status_code) != 200:
+            raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
+
+        threads = sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)[:top_n]
+        keyboard = [
+            [
+                InlineKeyboardButton(f'[{thread.length}] {{{thread.freshness:.2f}}} {thread.header}', callback_data = thread.id)
+            ]
+            for thread in threads
+        ]
+
+        markup = InlineKeyboardMarkup(keyboard)
+
+        # await user.send_message(f'Here will be a menu for choosing a right thread out of top {top_n} threads. Now please send a filename')
+
+        await update.message.reply_text('Please, choose thread to generate speech for:', reply_markup = markup)
+
+        return BUTTON
+
+    async def _button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        query = update.callback_query
+        context.user_data['thread_id'] = query.data
+
+        # await user.send_message(f'Ok, called button handler for option {query.data}')
+        await user.send_message('Ok, now please send me the filename')
+
+        return FILENAME
+
+    async def _filename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
 
         if user.id != chat_id:
             return
 
         message = update.message.text
-        # parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
-        parts = normalize(message.strip()).split(' ', maxsplit = 1)
+        # await user.send_message(f'Fine, got your file name. Saving thread {context.user_data["thread_id"]} as "{message}"')
+        await speak(user, context.user_data['thread_id'], message)
 
-        thread_id = parts[0]
-        url = None
+        return ConversationHandler.END
 
-        if len(parts) > 1:
-            thread_title = parts[1]
-        else:
-            thread_title = None
+    async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
 
-        if thread_id.startswith('http'):
-            url = thread_id
-            thread_id = Path(url).stem
-
-        try:
-            thread_id = int(thread_id)
-        except ValueError:
-            await user.send_message(f'Unsupported thread id: {thread_id}')
+        if user.id != chat_id:
             return
+
+        await user.send_message('Cancelling the last operation')
+
+        return ConversationHandler.END
+
+    async def speak(user, thread_id: int, thread_title: str, url = None):
+        nonlocal last_auth_timestamp
 
         await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
@@ -187,7 +253,56 @@ def start(assets: str, cloud: str):
                 if response['status'] != 200:
                     await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
 
+    async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        # await update.effective_user.send_message(f'Started handling message {update.message.text}')
+        # # print(f'Started handling message {update.message.text}')
+
+        # await asyncio.sleep(5)
+
+        # # await update.effective_user.send_message(f'Stopped handling message {update.message.text}')
+        # print(f'Stopped handling message {update.message.text}')
+
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        message = update.message.text
+        # parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
+        parts = normalize(message.strip()).split(' ', maxsplit = 1)
+
+        thread_id = parts[0]
+        url = None
+
+        if len(parts) > 1:
+            thread_title = parts[1]
+        else:
+            thread_title = None
+
+        if thread_id.startswith('http'):
+            url = thread_id
+            thread_id = Path(url).stem
+
+        try:
+            thread_id = int(thread_id)
+        except ValueError:
+            await user.send_message(f'Unsupported thread id: {thread_id}')
+            return
+
+        await speak(user, thread_id, thread_title, url)
+
     bot = ApplicationBuilder().token(token).defaults(Defaults(block = False)).build()
+
+    bot.add_handler(
+        ConversationHandler(
+            entry_points = [CommandHandler('top', _top)],
+            states = {
+                BUTTON: [CallbackQueryHandler(_button)],
+                FILENAME: [MessageHandler(~filters.COMMAND, _filename)]
+            },
+            fallbacks = [CommandHandler('cancel', _cancel)]
+        )
+    )
 
     # bot.add_handler(CommandHandler('speak', _speak))
     # bot.add_handler(CommandHandler('s', _speak))
