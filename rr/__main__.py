@@ -1,4 +1,4 @@
-# import re
+import re
 from os import path, makedirs, listdir, environ as env, stat
 import asyncio
 from time import time, sleep
@@ -66,10 +66,19 @@ KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
 KARMA_AUTH_TIMEOUT = 1800  # seconds
 
 CATALOG_URL = 'https://2ch.hk/b/catalog.json'
-N_TOP_THREADS = 10
+N_TOP_THREADS = 50
 
 FILENAME = 'filename'
 BUTTON = 'button'
+
+NEXT_BUTTON = 'next-button'
+NEXT = 'next'
+PREVIOUS = 'previous'
+THREAD = 'thread'
+CANCEL = 'cancel'
+
+URL_REGEXP = re.compile('http.+')
+MAX_URL_LENGTH = 92
 
 
 @group()
@@ -123,6 +132,159 @@ def start(assets: str, cloud: str):
     else:
         chat_id = int(chat_id)
 
+    def get_threads():
+        response = get(CATALOG_URL, timeout = 60)
+
+        if (status_code := response.status_code) != 200:
+            raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
+
+        return sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)
+
+    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        keyboard_line = [
+            InlineKeyboardButton('speak', callback_data = THREAD),
+            InlineKeyboardButton('quit', callback_data = CANCEL),
+        ]
+
+        thread_index = context.user_data.get('thread_index')
+
+        if thread_index is None:
+            thread_index = 0
+            context.user_data['threads'] = threads = get_threads()
+        else:
+            thread_index += 1
+            threads = context.user_data['threads']
+
+        if thread_index > 0:
+            keyboard_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *keyboard_line]
+
+        if thread_index < len(threads) - 1:
+            keyboard_line = [InlineKeyboardButton('next', callback_data = NEXT), *keyboard_line]
+
+        if thread_index >= len(threads):
+            await user.send_message('No more threads')
+
+            # context.user_data.pop('thread_index')
+            # context.user_data.pop('threads')
+            # context.user_data.pop('last_thread_description_message_id')
+
+            # return ConversationHandler.END
+            return NEXT_BUTTON
+
+        if (message_id := context.user_data.get('last_thread_description_message_id')) is not None:
+            await context.bot.delete_message(message_id = message_id, chat_id = user.id)
+
+        context.user_data['thread_index'] = thread_index
+
+        thread = threads[thread_index]
+
+        buttons = InlineKeyboardMarkup(
+            [
+                keyboard_line
+            ]
+        )
+
+        # message_text = f'{thread.title.replace("<br>", "<br/>")}<br/><br/><b>Length: {thread.length}</b><br/><b>Freshness: {thread.freshness}%</b>'
+
+        files = thread.files
+
+        message_text = f'{thread.link}\n\n{thread.title_text}\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**'
+
+        for match in URL_REGEXP.findall(message_text):
+            if len(match) > MAX_URL_LENGTH:
+                message_text = message_text.replace(match, match[:MAX_URL_LENGTH])
+
+        if len(files) > 0 and (file := files[0].link).endswith('png') or file.endswith('jpg') and len(message_text) <= 1024:
+            try:
+                message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+            except:
+                message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+        else:
+            message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+
+        context.user_data['last_thread_description_message_id'] = message.message_id
+
+        return NEXT_BUTTON
+
+    async def _previous(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if (thread_index := context.user_data.get('thread_index')) is None:
+            raise ValueError('Missing thread index. Can\'t go back')
+
+        if thread_index < 1:
+            await user.send_message('No previous threads')
+
+            return NEXT_BUTTON
+
+        context.user_data['thread_index'] = thread_index - 2
+
+        return await _next(update, context)
+
+    async def _next_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        data = update.callback_query.data
+
+        match data:
+            case 'next':
+                return await _next(update, context)
+            case 'thread':
+                return await _thread(update, context)
+            case 'cancel':
+                return await _next_cancel(update, context)
+            case 'previous':
+                return await _previous(update, context)
+            case _:
+                raise ValueError(f'Unsupported context data: {data}')
+
+    async def _thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        context.user_data.pop('last_thread_description_message_id')
+        await user.send_message(f'You have selected thread {context.user_data["thread_index"]}, now send me the filename')
+
+        return FILENAME
+
+    async def _next_filename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        # await user.send_message(f'Perfect, your thread is {context.user_data["thread_index"]} and your filename is {update.message.text}. Generating the speech...')
+        await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+
+        return await _next(update, context)
+
+    async def _next_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        await user.send_message('Cancelling the iteration over threads')
+
+        context.user_data.pop('thread_index')
+        context.user_data.pop('threads')
+        context.user_data.pop('last_thread_description_message_id')
+
+        return ConversationHandler.END
+
     async def _top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
 
@@ -144,17 +306,11 @@ def start(assets: str, cloud: str):
         #     ]
         # ]
 
-        response = get(CATALOG_URL, timeout = 60)
-
-        if (status_code := response.status_code) != 200:
-            raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
-
-        threads = sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)[:top_n]
         keyboard = [
             [
                 InlineKeyboardButton(f'[{thread.length}] {{{thread.freshness:.2f}}} {thread.header}', callback_data = thread.id)
             ]
-            for thread in threads
+            for thread in get_threads()[:top_n]
         ]
 
         markup = InlineKeyboardMarkup(keyboard)
@@ -301,6 +457,19 @@ def start(assets: str, cloud: str):
                 FILENAME: [MessageHandler(~filters.COMMAND, _filename)]
             },
             fallbacks = [CommandHandler('cancel', _cancel)]
+        )
+    )
+
+    bot.add_handler(
+        ConversationHandler(
+            entry_points = [CommandHandler('next', _next)],
+            states = {
+                NEXT: [CallbackQueryHandler(_next)],
+                NEXT_BUTTON: [CallbackQueryHandler(_next_button)],
+                # THREAD: [CallbackQueryHandler(_thread)],
+                FILENAME: [MessageHandler(~filters.COMMAND, _next_filename)]
+            },
+            fallbacks = [CommandHandler('cancel', _next_cancel)]
         )
     )
 
