@@ -76,6 +76,7 @@ NEXT = 'next'
 PREVIOUS = 'previous'
 THREAD = 'thread'
 CANCEL = 'cancel'
+KEEP = 'keep'
 
 URL_REGEXP = re.compile('http.+')
 MAX_URL_LENGTH = 92
@@ -140,7 +141,10 @@ def start(assets: str, cloud: str):
 
         return sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)
 
-    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def _keep(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        return await _next(update, context, delete_last = False)
+
+    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE, delete_last: bool = True) -> None:
         user = update.effective_user
 
         if user.id != chat_id:
@@ -148,8 +152,10 @@ def start(assets: str, cloud: str):
 
         keyboard_line = [
             InlineKeyboardButton('speak', callback_data = THREAD),
-            InlineKeyboardButton('quit', callback_data = CANCEL),
+            InlineKeyboardButton('keep', callback_data = KEEP),
+            InlineKeyboardButton('quit', callback_data = CANCEL)
         ]
+        movement_line = []
 
         thread_index = context.user_data.get('thread_index')
 
@@ -161,10 +167,10 @@ def start(assets: str, cloud: str):
             threads = context.user_data['threads']
 
         if thread_index > 0:
-            keyboard_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *keyboard_line]
+            movement_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *movement_line]
 
         if thread_index < len(threads) - 1:
-            keyboard_line = [InlineKeyboardButton('next', callback_data = NEXT), *keyboard_line]
+            movement_line = [InlineKeyboardButton('next', callback_data = NEXT), *movement_line]
 
         if thread_index >= len(threads):
             await user.send_message('No more threads')
@@ -176,7 +182,7 @@ def start(assets: str, cloud: str):
             # return ConversationHandler.END
             return NEXT_BUTTON
 
-        if (message_id := context.user_data.get('last_thread_description_message_id')) is not None:
+        if (message_id := context.user_data.get('last_thread_description_message_id')) is not None and delete_last:
             await context.bot.delete_message(message_id = message_id, chat_id = user.id)
 
         context.user_data['thread_index'] = thread_index
@@ -185,7 +191,8 @@ def start(assets: str, cloud: str):
 
         buttons = InlineKeyboardMarkup(
             [
-                keyboard_line
+                keyboard_line,
+                movement_line
             ]
         )
 
@@ -199,13 +206,20 @@ def start(assets: str, cloud: str):
             if len(match) > MAX_URL_LENGTH:
                 message_text = message_text.replace(match, match[:MAX_URL_LENGTH])
 
-        if len(files) > 0 and (file := files[0].link).endswith('png') or file.endswith('jpg') and len(message_text) <= 1024:
-            try:
-                message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
-            except:
+        try:
+            if len(files) > 0 and (file := files[0].link).endswith('png') or file.endswith('jpg') and len(message_text) <= 1024:
+                try:
+                    message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                except:
+                    message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+            else:
                 message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
-        else:
-            message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+        except:
+            message = await user.send_message(
+                f'Thread {thread.link} is not supported\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**',
+                reply_markup = buttons,
+                parse_mode = 'Markdown'
+            )
 
         context.user_data['last_thread_description_message_id'] = message.message_id
 
@@ -246,6 +260,8 @@ def start(assets: str, cloud: str):
                 return await _next_cancel(update, context)
             case 'previous':
                 return await _previous(update, context)
+            case 'keep':
+                return await _keep(update, context)
             case _:
                 raise ValueError(f'Unsupported context data: {data}')
 
@@ -267,7 +283,11 @@ def start(assets: str, cloud: str):
             return
 
         # await user.send_message(f'Perfect, your thread is {context.user_data["thread_index"]} and your filename is {update.message.text}. Generating the speech...')
-        await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+        # await asyncio.get_event_loop().run_in_executor(None, lambda: speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text))
+        # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+        # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+
+        context.job_queue.run_once(lambda _: speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text), when = 0)
 
         return await _next(update, context)
 
@@ -359,6 +379,11 @@ def start(assets: str, cloud: str):
 
     async def speak(user, thread_id: int, thread_title: str, url = None):
         nonlocal last_auth_timestamp
+
+        # await asyncio.sleep(5)
+        # await user.send_message('Has slept enough')
+
+        # return
 
         await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
