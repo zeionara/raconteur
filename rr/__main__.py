@@ -287,7 +287,10 @@ def start(assets: str, cloud: str):
         # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
         # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
 
-        context.job_queue.run_once(lambda _: speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text), when = 0)
+        thread_id = context.user_data['threads'][context.user_data['thread_index']].id
+        text = update.message.text
+
+        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 0)
 
         return await _next(update, context)
 
@@ -377,7 +380,7 @@ def start(assets: str, cloud: str):
 
         return ConversationHandler.END
 
-    async def speak(user, thread_id: int, thread_title: str, url = None):
+    async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False):
         nonlocal last_auth_timestamp
 
         # await asyncio.sleep(5)
@@ -385,7 +388,8 @@ def start(assets: str, cloud: str):
 
         # return
 
-        await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
+        if not quiet:
+            await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
         if url is None:
             url = f'https://2ch.hk/b/res/{thread_id}.html'
