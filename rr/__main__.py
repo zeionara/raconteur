@@ -151,7 +151,7 @@ def start(assets: str, cloud: str):
             return
 
         keyboard_line = [
-            InlineKeyboardButton('speak', callback_data = THREAD),
+            # InlineKeyboardButton('speak', callback_data = THREAD),
             InlineKeyboardButton('keep', callback_data = KEEP),
             InlineKeyboardButton('quit', callback_data = CANCEL)
         ]
@@ -271,7 +271,9 @@ def start(assets: str, cloud: str):
         if user.id != chat_id:
             return
 
-        context.user_data.pop('last_thread_description_message_id')
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
         await user.send_message(f'You have selected thread {context.user_data["thread_index"]}, now send me the filename')
 
         return FILENAME
@@ -286,6 +288,9 @@ def start(assets: str, cloud: str):
         # await asyncio.get_event_loop().run_in_executor(None, lambda: speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text))
         # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
         # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
 
         thread_id = context.user_data['threads'][context.user_data['thread_index']].id
         text = update.message.text
@@ -302,9 +307,12 @@ def start(assets: str, cloud: str):
 
         await user.send_message('Cancelling the iteration over threads')
 
-        context.user_data.pop('thread_index')
-        context.user_data.pop('threads')
-        context.user_data.pop('last_thread_description_message_id')
+        if 'thread_index' in context.user_data:
+            context.user_data.pop('thread_index')
+        if 'threads' in context.user_data:
+            context.user_data.pop('threads')
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
 
         return ConversationHandler.END
 
@@ -494,7 +502,7 @@ def start(assets: str, cloud: str):
             entry_points = [CommandHandler('next', _next)],
             states = {
                 NEXT: [CallbackQueryHandler(_next)],
-                NEXT_BUTTON: [CallbackQueryHandler(_next_button)],
+                NEXT_BUTTON: [CallbackQueryHandler(_next_button), MessageHandler(~filters.COMMAND, _next_filename)],
                 # THREAD: [CallbackQueryHandler(_thread)],
                 FILENAME: [MessageHandler(~filters.COMMAND, _next_filename)]
             },
