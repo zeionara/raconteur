@@ -211,9 +211,9 @@ def start(assets: str, cloud: str):
                 try:
                     message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
                 except:
-                    message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    message = await user.send_message(message_text[:4097], reply_markup = buttons, parse_mode = 'Markdown')
             else:
-                message = await user.send_message(message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                message = await user.send_message(message_text[:4097], reply_markup = buttons, parse_mode = 'Markdown')
         except:
             message = await user.send_message(
                 f'Thread {thread.link} is not supported\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**',
