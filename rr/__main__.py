@@ -77,6 +77,7 @@ PREVIOUS = 'previous'
 THREAD = 'thread'
 CANCEL = 'cancel'
 KEEP = 'keep'
+CLEAR = 'clear'
 
 URL_REGEXP = re.compile('http.+')
 MAX_URL_LENGTH = 92
@@ -153,7 +154,8 @@ def start(assets: str, cloud: str):
         keyboard_line = [
             # InlineKeyboardButton('speak', callback_data = THREAD),
             InlineKeyboardButton('keep', callback_data = KEEP),
-            InlineKeyboardButton('quit', callback_data = CANCEL)
+            InlineKeyboardButton('quit', callback_data = CANCEL),
+            InlineKeyboardButton('clear', callback_data = CLEAR)
         ]
         movement_line = []
 
@@ -206,14 +208,17 @@ def start(assets: str, cloud: str):
             if len(match) > MAX_URL_LENGTH:
                 message_text = message_text.replace(match, match[:MAX_URL_LENGTH])
 
+        def cut_message(message: str):
+            return message[:4096].replace('_', '\\_')
+
         try:
             if len(files) > 0 and (file := files[0].link).endswith('png') or file.endswith('jpg') and len(message_text) <= 1024:
                 try:
                     message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
                 except:
-                    message = await user.send_message(message_text[:4097], reply_markup = buttons, parse_mode = 'Markdown')
+                    message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
             else:
-                message = await user.send_message(message_text[:4097], reply_markup = buttons, parse_mode = 'Markdown')
+                message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
         except:
             message = await user.send_message(
                 f'Thread {thread.link} is not supported\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**',
@@ -262,6 +267,10 @@ def start(assets: str, cloud: str):
                 return await _previous(update, context)
             case 'keep':
                 return await _keep(update, context)
+            case 'clear':
+                if (message_id := context.user_data.get('last_thread_description_message_id')) is not None:
+                    await context.bot.delete_message(message_id = message_id, chat_id = user.id)
+                return await _next_cancel(update, context, quiet = True)
             case _:
                 raise ValueError(f'Unsupported context data: {data}')
 
@@ -299,13 +308,14 @@ def start(assets: str, cloud: str):
 
         return await _next(update, context)
 
-    async def _next_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def _next_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, quiet: bool = False) -> None:
         user = update.effective_user
 
         if user.id != chat_id:
             return
 
-        await user.send_message('Cancelling the iteration over threads')
+        if not quiet:
+            await user.send_message('Cancelling the iteration over threads')
 
         if 'thread_index' in context.user_data:
             context.user_data.pop('thread_index')
