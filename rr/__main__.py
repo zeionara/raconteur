@@ -82,6 +82,8 @@ CLEAR = 'clear'
 URL_REGEXP = re.compile('http.+')
 MAX_URL_LENGTH = 92
 
+NEWLINE = '\n'
+
 
 @group()
 def main():
@@ -91,7 +93,9 @@ def main():
 @main.command()
 @argument('assets', type = str, default = '/tmp')
 @option('--cloud', '-c', help = 'path to remote folder in mail ru cloud for uploading generated audio files', type = str, default = None)
-def start(assets: str, cloud: str):
+@option('--alternation-list-path', '-a', help = 'path to the file with an alternation list', type = str)
+@option('--alternation-target', '-t', help = 'Path to folder with alternated mp3 files', type = str)
+def start(assets: str, cloud: str, alternation_list_path: str, alternation_target: str):
     # response = get(CATALOG_URL)
 
     # if (status_code := response.status_code) != 200:
@@ -105,6 +109,9 @@ def start(assets: str, cloud: str):
 
     token = env.get(TELEGRAM_TOKEN_ENV)
     chat_id = env.get(CHAT_ID_ENV)
+
+    alternated_list = None if alternation_list_path is None else []
+    alternated_list_lock = None if alternated_list is None else asyncio.Lock()
 
     if cloud is not None:
         karma_username = env.get(KARMA_USERNAME_ENV)
@@ -304,6 +311,12 @@ def start(assets: str, cloud: str):
         thread_id = context.user_data['threads'][context.user_data['thread_index']].id
         text = update.message.text
 
+        # if (alternated_list := context.user_data.get('alternated_list')) is None:
+        #     context.user_data['alternated_list'] = alternated_list = []
+
+        # print('alternated list:', alternated_list)
+
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True, alternated_list = alternated_list), when = 0)
         context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 0)
 
         return await _next(update, context)
@@ -398,6 +411,7 @@ def start(assets: str, cloud: str):
 
         return ConversationHandler.END
 
+    # async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False, alternated_list: list = None):
     async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False):
         nonlocal last_auth_timestamp
 
@@ -414,6 +428,10 @@ def start(assets: str, cloud: str):
 
         filename = thread_id if thread_title is None else thread_title.lower().replace(' ', '-')
 
+        if alternated_list is not None:
+            async with alternated_list_lock:
+                alternated_list.append((user.id, f'{filename}-full'))
+
         text_path = path.join(assets, f'{filename}.txt')
         audio_path = path.join(assets, f'{filename}.mp3')
 
@@ -428,6 +446,10 @@ def start(assets: str, cloud: str):
             await user.send_message(f'Thread {thread_id} does not exist')
         else:
             if not path.isfile(audio_path):
+                if alternation_list_path is not None:
+                    with open(alternation_list_path, 'a', encoding = 'utf-8') as file:
+                        file.write(f'{thread_id} {filename}-full{NEWLINE}')
+
                 try:
                     # raise ValueError('test')
                     await asyncio.get_event_loop().run_in_executor(None, lambda: _alternate(text_path, artist_one = 'xenia', artist_two = 'baya'))
@@ -439,7 +461,7 @@ def start(assets: str, cloud: str):
                 try:
                     await user.send_audio(audio_file, title = thread_title)
                 except NetworkError:
-                    await user.send_message(f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()}```\nPlease try again", parse_mode = 'Markdown')
+                    await user.send_message(f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again", parse_mode = 'Markdown')
 
             # print(time() - last_auth_timestamp)
 
@@ -519,6 +541,53 @@ def start(assets: str, cloud: str):
             fallbacks = [CommandHandler('cancel', _next_cancel)]
         )
     )
+
+    async def check_alternation_status(context: ContextTypes.DEFAULT_TYPE):
+        nonlocal last_auth_timestamp
+
+        # alternated_list = context.user_data.get('alternated_list')
+
+        # print(dir(context))
+
+        # print('checking alternation status, alternated list:', alternated_list)
+
+        if alternated_list is not None:
+            for element in list(alternated_list):
+                user_id, item = element
+
+                audio_path = path.join(alternation_target, f'{item}.mp3')
+
+                # print('checking file', audio_path)
+
+                if path.isfile(audio_path):
+                    with open(audio_path, 'rb') as audio_file:
+                        try:
+                            await context.bot.send_audio(user_id, audio_file, title = item)
+                        except NetworkError:
+                            await context.bot.send_message(
+                                user_id,
+                                f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again",
+                                parse_mode = 'Markdown'
+                            )
+
+                    if uploader is not None:
+                        if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
+                            uploader.auth()
+                            last_auth_timestamp = current_time
+
+                        response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
+
+                        print('File uploading result:')
+                        print(response)
+
+                        if response['status'] != 200:
+                            await context.bot.send_message(user_id, f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
+
+                    async with alternated_list_lock:
+                        alternated_list.remove(element)
+
+    if alternation_target is not None:
+        bot.job_queue.run_repeating(check_alternation_status, interval = 3600, first = 600)
 
     # bot.add_handler(CommandHandler('speak', _speak))
     # bot.add_handler(CommandHandler('s', _speak))
