@@ -430,10 +430,10 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         if alternated_list is not None:
             async with alternated_list_lock:
-                alternated_list.append((user.id, f'{filename}-full'))
+                alternated_list.append((user.id, f'{filename}'))
 
-        text_path = path.join(assets, f'{filename}.txt')
-        audio_path = path.join(assets, f'{filename}.mp3')
+        text_path = path.join(assets, f'{filename}-snapshot.txt')
+        audio_path = path.join(assets, f'{filename}-snapshot.mp3')
 
         if not path.isfile(text_path):
             print(f'Pulling url {url}...')
@@ -448,7 +448,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             if not path.isfile(audio_path):
                 if alternation_list_path is not None:
                     with open(alternation_list_path, 'a', encoding = 'utf-8') as file:
-                        file.write(f'{thread_id} {filename}-full{NEWLINE}')
+                        file.write(f'{thread_id} {filename}{NEWLINE}')
 
                 try:
                     # raise ValueError('test')
