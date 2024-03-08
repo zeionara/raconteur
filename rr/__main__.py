@@ -40,8 +40,9 @@ from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_empty_lines
+from .util import one_is_not_none, read, is_audio, post_process_summary, truncate_translation  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
+from .HuggingFaceClient import HuggingFaceClient, Task
 
 from .alternator import _alternate, _alternate_pool_wrapper
 from .Thread import Thread
@@ -78,6 +79,7 @@ THREAD = 'thread'
 CANCEL = 'cancel'
 KEEP = 'keep'
 CLEAR = 'clear'
+TAKE = 'take'
 
 URL_REGEXP = re.compile('http.+')
 MAX_URL_LENGTH = 92
@@ -95,7 +97,8 @@ def main():
 @option('--cloud', '-c', help = 'path to remote folder in mail ru cloud for uploading generated audio files', type = str, default = None)
 @option('--alternation-list-path', '-a', help = 'path to the file with an alternation list', type = str)
 @option('--alternation-target', '-t', help = 'Path to folder with alternated mp3 files', type = str)
-def start(assets: str, cloud: str, alternation_list_path: str, alternation_target: str):
+@option('--hf-cache', type = str)
+def start(assets: str, cloud: str, alternation_list_path: str, alternation_target: str, hf_cache: str):
     # response = get(CATALOG_URL)
 
     # if (status_code := response.status_code) != 200:
@@ -112,6 +115,9 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
     alternated_list = None if alternation_list_path is None else []
     alternated_list_lock = None if alternated_list is None else asyncio.Lock()
+
+    summarization_client = HuggingFaceClient(hf_cache = hf_cache, local = True, device = 0)
+    translation_client = HuggingFaceClient(model = 'Helsinki-NLP/opus-mt-ru-en', task = Task.TRANSLATION, local = True, hf_cache = hf_cache, device = 0)
 
     if cloud is not None:
         karma_username = env.get(KARMA_USERNAME_ENV)
@@ -162,7 +168,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             # InlineKeyboardButton('speak', callback_data = THREAD),
             InlineKeyboardButton('keep', callback_data = KEEP),
             InlineKeyboardButton('quit', callback_data = CANCEL),
-            InlineKeyboardButton('clear', callback_data = CLEAR)
+            InlineKeyboardButton('clear', callback_data = CLEAR),
+            InlineKeyboardButton('take', callback_data = TAKE)
         ]
         movement_line = []
 
@@ -171,9 +178,13 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         if thread_index is None:
             thread_index = 0
             context.user_data['threads'] = threads = get_threads()
+
+            # summaries = [post_process_summary(summary) for summary in summarization_client.infer_many([thread.title_text for thread in threads])]
+            # context.user_data['filenames'] = filenames = [truncate_translation(translation) for translation in translation_client.infer_many(summaries)]
         else:
             thread_index += 1
             threads = context.user_data['threads']
+            # filenames = context.user_data['filenames']
 
         if thread_index > 0:
             movement_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *movement_line]
@@ -197,6 +208,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         context.user_data['thread_index'] = thread_index
 
         thread = threads[thread_index]
+        # filename = filenames[thread_index]
+        context.user_data['proposed_filename'] = filename = truncate_translation(translation_client.infer_one(post_process_summary(summarization_client.infer_one(thread.title))))
 
         buttons = InlineKeyboardMarkup(
             [
@@ -209,7 +222,11 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         files = thread.files
 
-        message_text = f'{thread.link}\n\n{thread.title_text}\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**'
+        message_text = (
+            f'{thread.link}\n\n{thread.title_text}\n\n{thread.links}\n\n'
+            f'**Proposed filename**: `{filename}`\n\n'
+            f'**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**'
+        )
 
         for match in URL_REGEXP.findall(message_text):
             if len(match) > MAX_URL_LENGTH:
@@ -274,6 +291,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                 return await _previous(update, context)
             case 'keep':
                 return await _keep(update, context)
+            case 'take':
+                return await _take(update, context)
             case 'clear':
                 if (message_id := context.user_data.get('last_thread_description_message_id')) is not None:
                     await context.bot.delete_message(message_id = message_id, chat_id = user.id)
@@ -293,6 +312,23 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         await user.send_message(f'You have selected thread {context.user_data["thread_index"]}, now send me the filename')
 
         return FILENAME
+
+    async def _take(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
+        thread_id = context.user_data['threads'][context.user_data['thread_index']].id
+        text = context.user_data['proposed_filename']
+
+        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 10)
+        # context.job_queue.run_once(speak, when = 0, job_kwargs = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True})
+
+        return await _next(update, context)
 
     async def _next_filename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
@@ -317,7 +353,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         # print('alternated list:', alternated_list)
 
         # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True, alternated_list = alternated_list), when = 0)
-        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 0)
+        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 10)
 
         return await _next(update, context)
 
