@@ -562,7 +562,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                 if path.isfile(audio_path):
                     with open(audio_path, 'rb') as audio_file:
                         try:
-                            await context.bot.send_audio(user_id, audio_file, title = item)
+                            await context.bot.send_audio(user_id, audio_file, title = item.replace('-', ' '))
                         except NetworkError:
                             await context.bot.send_message(
                                 user_id,
