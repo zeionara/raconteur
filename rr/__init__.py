@@ -1,3 +1,7 @@
+from warnings import filterwarnings
+
+filterwarnings('ignore', category = UserWarning)
+
 from .Splitter import Splitter
 # from .Bark import Bark
 

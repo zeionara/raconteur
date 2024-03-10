@@ -9,6 +9,9 @@ from requests import post
 WAITING_INTERVAL = 60
 N_ATTEMPTS = 5
 
+DEFAULT_MAX_SUMMARY_LENGTH = 100
+DEFAULT_MAX_TRANSLATION_LENGTH = 512
+
 
 class Task(Enum):
     SUMMARIZATION = 'summarization'
@@ -51,7 +54,7 @@ class HuggingFaceClient:
         if local:
             self._init_model()
         else:
-            self.model = None
+            self._model = None
 
     def _init_model(self):
         hf_cache = self.hf_cache
@@ -63,28 +66,70 @@ class HuggingFaceClient:
             _hf_cache = env.get('HF_CACHE')
             env['HF_CACHE'] = hf_cache
 
-        self.model = pipeline(self.task.value, model = self.model, device = self.device)
+        self._model = pipeline(self.task.value, model = self.model, device = self.device)
 
         if hf_cache is not None and _hf_cache is not None:
             env['HF_CACHE'] = _hf_cache
 
-    def infer_one(self, text: str):
+    def infer_one(self, text: str, max_length: int = None):
         if not self.local:
             raise ValueError('The client does not use a local model')
 
-        return self.model(text)[0][self.task.property]
+        if max_length is None:
+            if self.task == Task.SUMMARIZATION:
+                max_length = DEFAULT_MAX_SUMMARY_LENGTH
+            else:  # if self.task == Task.TRANSLATION
+                max_length = DEFAULT_MAX_TRANSLATION_LENGTH
+        elif self.task != Task.SUMMARIZATION:
+            raise ValueError('Max length is not allowed for non-summarization tasks')
 
-    def infer_many(self, texts: list[str]):
+        # return self.model(text, max_length = min(max_length, len(text)))[0][self.task.property]
+
+        model = self._model
+        task = self.task
+
+        return model(
+            text, max_length = max_length if task == Task.TRANSLATION else min(
+                max_length,
+                len(
+                    model.tokenizer.tokenize(text)
+                )
+            )
+        )[0][self.task.property]
+
+    def infer_many(self, texts: list[str], max_length: int = None):
         if not self.local:
             raise ValueError('The client does not use a local model')
 
-        return [item[self.task.property] for item in self.model(texts)]
+        if max_length is None:
+            if self.task == Task.SUMMARIZATION:
+                max_length = DEFAULT_MAX_SUMMARY_LENGTH
+            else:  # if self.task == Task.TRANSLATION
+                max_length = DEFAULT_MAX_TRANSLATION_LENGTH
+        elif self.task != Task.SUMMARIZATION:
+            raise ValueError('Max length is not allowed for non-summarization tasks')
 
-    def summarize(self, text: str, verbose: bool = False):
+        # return [item[self.task.property] for item in self.model(texts, max_length = max_length)]
+        model = self._model
+        task = self.task
+
+        return [
+            model(
+                text, max_length = DEFAULT_MAX_TRANSLATION_LENGTH if task == Task.TRANSLATION else min(
+                    max_length,
+                    len(
+                        model.tokenizer.tokenize(text)
+                    )
+                )
+            )[0][self.task.property]
+            for text in texts
+        ]
+
+    def apply(self, text: str, verbose: bool = False, max_length: int = None):
         n_attempts = 0
 
         if self.local:
-            return self.infer_one(text)
+            return self.infer_one(text, max_length)
 
         while True:
             response = post(self.url, headers = self.headers, json = text)
@@ -102,20 +147,20 @@ class HuggingFaceClient:
                         print('Proceeding...')
                 else:
                     if n_attempts > N_ATTEMPTS:
-                        if self.model is None:
+                        if self._model is None:
                             self._init_model()
                             self.local = True
-                        return self.infer_one(text)
+                        return self.infer_one(text, max_length)
                         # raise ValueError(f'Unexpected error format: {response_json}')
                     else:
                         n_attempts += 1
                         sleep(WAITING_INTERVAL)
             else:
                 if n_attempts > N_ATTEMPTS:
-                    if self.model is None:
+                    if self._model is None:
                         self._init_model()
                         self.local = True
-                    return self.infer_one(text)
+                    return self.infer_one(text, max_length)
                     # raise ValueError(f'Unexpected response status code: {response.status_code}')
                 else:
                     n_attempts += 1

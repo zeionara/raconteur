@@ -25,7 +25,7 @@ from tqdm import tqdm
 # import torch
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import NetworkError
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults, ConversationHandler, CallbackQueryHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults, ConversationHandler, CallbackQueryHandler, CallbackContext
 from telegram.warnings import PTBUserWarning
 
 from much import Fetcher, Exporter, Format, normalize
@@ -68,6 +68,7 @@ KARMA_AUTH_TIMEOUT = 1800  # seconds
 
 CATALOG_URL = 'https://2ch.hk/b/catalog.json'
 N_TOP_THREADS = 50
+SPEAK_CALL_DELAY = 0
 
 FILENAME = 'filename'
 BUTTON = 'button'
@@ -168,8 +169,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             # InlineKeyboardButton('speak', callback_data = THREAD),
             InlineKeyboardButton('keep', callback_data = KEEP),
             InlineKeyboardButton('quit', callback_data = CANCEL),
-            InlineKeyboardButton('clear', callback_data = CLEAR),
-            InlineKeyboardButton('take', callback_data = TAKE)
+            InlineKeyboardButton('clear', callback_data = CLEAR)
         ]
         movement_line = []
 
@@ -209,7 +209,13 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         thread = threads[thread_index]
         # filename = filenames[thread_index]
-        context.user_data['proposed_filename'] = filename = truncate_translation(translation_client.infer_one(post_process_summary(summarization_client.infer_one(thread.title))))
+        try:
+            context.user_data['proposed_filename'] = filename = truncate_translation(translation_client.infer_one(post_process_summary(summarization_client.infer_one(thread.title))))
+        except:
+            context.user_data['proposed_filename'] = filename = None
+
+        if filename is not None:
+            keyboard_line.append(InlineKeyboardButton('take', callback_data = TAKE))
 
         buttons = InlineKeyboardMarkup(
             [
@@ -224,7 +230,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         message_text = (
             f'{thread.link}\n\n{thread.title_text}\n\n{thread.links}\n\n'
-            f'**Proposed filename**: `{filename}`\n\n'
+            f'**Proposed filename**: `{"<filename generation error>" if filename is None else filename}`\n\n'
             f'**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**'
         )
 
@@ -325,8 +331,14 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         thread_id = context.user_data['threads'][context.user_data['thread_index']].id
         text = context.user_data['proposed_filename']
 
-        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 10)
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = SPEAK_CALL_DELAY)
         # context.job_queue.run_once(speak, when = 0, job_kwargs = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True})
+        context.job_queue.run_once(
+            speak_job,
+            data = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True},
+            job_kwargs={"misfire_grace_time": None},
+            when = SPEAK_CALL_DELAY
+        )
 
         return await _next(update, context)
 
@@ -353,7 +365,13 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         # print('alternated list:', alternated_list)
 
         # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True, alternated_list = alternated_list), when = 0)
-        context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = 10)
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = SPEAK_CALL_DELAY)
+        context.job_queue.run_once(
+            speak_job,
+            data = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True},
+            job_kwargs={"misfire_grace_time": None},
+            when = SPEAK_CALL_DELAY
+        )
 
         return await _next(update, context)
 
@@ -446,6 +464,9 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         await user.send_message('Cancelling the last operation')
 
         return ConversationHandler.END
+
+    async def speak_job(context: CallbackContext):
+        return await speak(**context.job.data)
 
     # async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False, alternated_list: list = None):
     async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False):
