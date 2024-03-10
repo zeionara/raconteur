@@ -114,7 +114,9 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
     token = env.get(TELEGRAM_TOKEN_ENV)
     chat_id = env.get(CHAT_ID_ENV)
 
-    alternated_list = None if alternation_list_path is None else []
+    alternated_list = None if alternation_list_path is None else [
+        (461276983, 'immigrants-from-asia-in-moscow')
+    ]
     alternated_list_lock = None if alternated_list is None else asyncio.Lock()
 
     summarization_client = HuggingFaceClient(hf_cache = hf_cache, local = True, device = 0)
@@ -148,18 +150,21 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
     else:
         chat_id = int(chat_id)
 
-    def get_threads():
+    def get_threads(reverse: bool = True):
         response = get(CATALOG_URL, timeout = 60)
 
         if (status_code := response.status_code) != 200:
             raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
 
-        return sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)
+        return sorted(Thread.from_list(response.json()['threads']), key = lambda thread: (thread.length, thread.freshness), reverse = reverse)
 
     async def _keep(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await _next(update, context, delete_last = False)
 
-    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE, delete_last: bool = True) -> None:
+    async def _tail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        return await _next(update, context, reverse = True)
+
+    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE, delete_last: bool = True, reverse: bool = False) -> None:
         user = update.effective_user
 
         if user.id != chat_id:
@@ -176,12 +181,30 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         thread_index = context.user_data.get('thread_index')
 
         if thread_index is None:
-            thread_index = 0
-            context.user_data['threads'] = threads = get_threads()
+            offset = None
+
+            if update.message is not None:
+                message_parts = normalize(message := update.message.text).split(' ')
+
+                if (n_message_parts := len(message_parts)) > 1:
+                    if n_message_parts < 3:
+                        try:
+                            offset = int(message_parts[1])
+                        except ValueError:
+                            await user.send_message(f'Incorrect offset: {message_parts[1]}')
+                            return
+                    else:
+                        await user.send_message(f'Too many arguments in the call: {message}')
+                        return
+
+            context.user_data['threads'] = threads = get_threads(not reverse)
+            thread_index = 0 if offset is None else offset
+            context.user_data['reverse'] = reverse
 
             # summaries = [post_process_summary(summary) for summary in summarization_client.infer_many([thread.title_text for thread in threads])]
             # context.user_data['filenames'] = filenames = [truncate_translation(translation) for translation in translation_client.infer_many(summaries)]
         else:
+            # reverse = context.user_data['reverse']
             thread_index += 1
             threads = context.user_data['threads']
             # filenames = context.user_data['filenames']
@@ -274,6 +297,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
             return NEXT_BUTTON
 
+        # reverse = context.user_data['reverse']
         context.user_data['thread_index'] = thread_index - 2
 
         return await _next(update, context)
@@ -588,7 +612,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
     bot.add_handler(
         ConversationHandler(
-            entry_points = [CommandHandler('next', _next)],
+            entry_points = [CommandHandler('next', _next), CommandHandler('tail', _tail)],
             states = {
                 NEXT: [CallbackQueryHandler(_next)],
                 NEXT_BUTTON: [CallbackQueryHandler(_next_button), MessageHandler(~filters.COMMAND, _next_filename)],
@@ -608,13 +632,17 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         # print('checking alternation status, alternated list:', alternated_list)
 
+        print('Checking alternated list:')
+        print(alternated_list)
+
         if alternated_list is not None:
             for element in list(alternated_list):
                 user_id, item = element
 
                 audio_path = path.join(alternation_target, f'{item}.mp3')
 
-                # print('checking file', audio_path)
+                print('checking file', audio_path)
+                print(path.isfile(audio_path))
 
                 if path.isfile(audio_path):
                     with open(audio_path, 'rb') as audio_file:
