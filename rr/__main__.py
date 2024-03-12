@@ -40,7 +40,7 @@ from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read, is_audio, post_process_summary, truncate_translation  # , drop_accent_marks, drop_empty_lines
+from .util import one_is_not_none, read, is_audio, is_image, is_video, post_process_summary, truncate_translation  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
 from .HuggingFaceClient import HuggingFaceClient, Task
 
@@ -265,10 +265,17 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             return message[:4096].replace('_', '\\_')
 
         try:
-            if len(files) > 0 and (file := files[0].link).endswith('png') or file.endswith('jpg') and len(message_text) <= 1024:
+            if len(files) > 0 and len(message_text) <= 1024:
+                file = files[0].link
                 try:
-                    message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    if is_image(file):
+                        message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    elif is_video(file):
+                        message = await user.send_video(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    else:
+                        message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
                 except:
+                    print(format_exc())
                     message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
             else:
                 message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
@@ -632,8 +639,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
         # print('checking alternation status, alternated list:', alternated_list)
 
-        print('Checking alternated list:')
-        print(alternated_list)
+        print('Checking alternated list')
+        # print(alternated_list)
 
         if alternated_list is not None:
             for element in list(alternated_list):
@@ -641,8 +648,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
                 audio_path = path.join(alternation_target, f'{item}.mp3')
 
-                print('checking file', audio_path)
-                print(path.isfile(audio_path))
+                # print('checking file', audio_path)
+                # print(path.isfile(audio_path))
 
                 if path.isfile(audio_path):
                     with open(audio_path, 'rb') as audio_file:
