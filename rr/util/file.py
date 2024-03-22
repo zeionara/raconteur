@@ -1,3 +1,4 @@
+from time import sleep
 from pathlib import Path
 
 
@@ -20,3 +21,7 @@ def is_image(path: str):
 
 def is_video(path: str):
     return Path(path).suffix in VIDEO_EXTENSIONS
+
+
+def is_url(path: str):
+    return path.startswith('http')

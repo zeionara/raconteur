@@ -86,6 +86,7 @@ URL_REGEXP = re.compile('http.+')
 MAX_URL_LENGTH = 92
 
 NEWLINE = '\n'
+MIN_SUMMARY_LENGTH = 40
 
 
 @group()
@@ -114,9 +115,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
     token = env.get(TELEGRAM_TOKEN_ENV)
     chat_id = env.get(CHAT_ID_ENV)
 
-    alternated_list = None if alternation_list_path is None else [
-        (461276983, 'immigrants-from-asia-in-moscow')
-    ]
+    alternated_list = None if alternation_list_path is None else []
     alternated_list_lock = None if alternated_list is None else asyncio.Lock()
 
     summarization_client = HuggingFaceClient(hf_cache = hf_cache, local = True, device = 0)
@@ -233,7 +232,11 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         thread = threads[thread_index]
         # filename = filenames[thread_index]
         try:
-            context.user_data['proposed_filename'] = filename = truncate_translation(translation_client.infer_one(post_process_summary(summarization_client.infer_one(thread.title))))
+            context.user_data['proposed_filename'] = filename = truncate_translation(
+                translation_client.infer_one(
+                    thread.title if len(thread.title) <= MIN_SUMMARY_LENGTH else post_process_summary(summarization_client.infer_one(thread.title))
+                )
+            )
         except:
             context.user_data['proposed_filename'] = filename = None
 
