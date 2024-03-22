@@ -49,10 +49,11 @@ def post_process_summary(text: str, min_duplicate_fraction: float = 0.25):
 
     for trailer in DELETED_TRAILERS:
         if text.startswith(trailer):
+            first_character = text[0]
             text = text[1:]
 
-        if text.endswith(trailer):
-            text = text[:-1]
+            if text.endswith(first_character):
+                text = text[:-1]
 
     # 2. Delete repeating chunks of text
 
