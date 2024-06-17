@@ -22,7 +22,7 @@ class RaconteurFactory:
                     # client_id = env['SALUTE_SPEECH_CLIENT_ID'],
                     # client_secret = env['SALUTE_SPEECH_CLIENT_SECRET'],
                     auth = env['SALUTE_SPEECH_AUTH'],
-                    artist = 'Nec',
+                    artist = artist,
                     splitter = Splitter(4000 if max_n_characters is None else max_n_characters)
                 )
             # case Bark.name:
