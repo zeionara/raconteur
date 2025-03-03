@@ -1,5 +1,6 @@
-from os import path, makedirs
+from os import path, makedirs, walk
 from time import time
+from pathlib import Path
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -62,6 +63,29 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 
 
 @main.command()
+@argument('source', type = str, default = 'assets/default-03.03.2025.tsv')
+@argument('destination', type = str, default = 'assets/speech')
+@argument('output', type = str, default = 'assets/changelog.txt')
+def make_changelog(source: str, destination: str, output: str):
+    existing_files = set()
+
+    for root, dirs, files in walk(destination):
+        for name in files:
+            existing_files.add(Path(name).stem)
+
+    df = read_csv(source, sep = '\t')
+
+    new_files = []
+
+    for _, row in df.loc[:, ('id', 'text', 'source')].iterrows():
+        name = f'{row["id"]:08d}.{row["source"]}'
+        if name not in existing_files:
+            new_files.append(name)
+
+    with open(output, 'w', encoding = 'utf-8') as file:
+        file.writelines([line + '\n' for line in new_files])
+
+@main.command()
 @option('--source', '-s', help = 'path to the input tsv file with anecdotes', type = str, default = 'assets/anecdotes.tsv')
 @option('--destination', '-d', help = 'path to the output directory with anecdotes', type = str, default = 'assets/anecdotes')
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
@@ -76,9 +100,10 @@ def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: s
 @option('--cloud-root', '-x', help = 'root folder where to upload generated mp3 files', type = str)
 @option('--upload-and-quit', '-q', help = 'upload files to cloud if they exist before starting speech generation', is_flag = True)
 @option('--verbose', '-v', help = 'whether to enable additional logging', is_flag = True)
+@option('--changelog', type = str, default = None)
 def handle_aneks(
     source: str, destination: str, max_n_characters: int, top_n: int, offset: int, gpu: bool, engine: str, russian: bool, skip_if_exists: bool,
-    username: str, password: str, cloud_root: str, upload_and_quit: bool, verbose: bool
+    username: str, password: str, cloud_root: str, upload_and_quit: bool, verbose: bool, changelog: str = None
 ):
     if not path.isdir(destination):
         makedirs(destination)
@@ -97,8 +122,14 @@ def handle_aneks(
 
     start = time()
 
+    if changelog is not None:
+        with open(changelog, 'r', encoding = 'utf-8') as file:
+            changelog = set(line[:-1] for line in file.readlines())
+
     with beep():
         for _, row in (
+            df
+            if changelog is not None else
             (
                 df if offset is None else df.iloc[offset:,]
             )
@@ -109,9 +140,17 @@ def handle_aneks(
         ).loc[:, ('id', 'text', 'source')].iterrows():
             text = row['text']
 
-            name = f'{row["id"]:08d}.{row["source"]}.mp3'
+            name = f'{row["id"]:08d}.{row["source"]}'
+
+            print(name)
+
+            if changelog is not None and name not in changelog:
+                continue
+
+            print('--')
+
             # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
-            filename = path.join(destination, name)
+            filename = path.join(destination, f'{name}.mp3')
 
             # print(f'Handling "{text}"')
             if upload_and_quit and cm is not None and path.isfile(filename):
@@ -119,7 +158,7 @@ def handle_aneks(
                 status = None
 
                 while status != 200:
-                    response = cm.api.file.add(filename, f'{cloud_root}/{name}')
+                    response = cm.api.file.add(filename, f'{cloud_root}/{name}.mp3')
                     status = response['status']
 
                 # response = cm.api.file(f'{cloud_root}/{name}')
@@ -149,6 +188,9 @@ def handle_aneks(
             n_aneks += 1
 
             print(f'Handled {n_aneks} aneks')
+
+            if changelog is not None and n_aneks > top_n:
+                break
 
         elapsed = time() - start
         print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
