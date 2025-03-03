@@ -9,7 +9,7 @@ def get_readme():
 setup(
     name = 'raconteur',
     packages = find_packages(),
-    version = '0.4',
+    version = '0.5',
     license = 'Apache 2.0',
     description = 'An auxiliary app for simplifying speech synthesis on arbitrary texts',
     long_description = get_readme(),

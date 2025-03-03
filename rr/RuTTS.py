@@ -3,10 +3,12 @@ import re
 from RUTTS import TTS
 from ruaccent import RUAccent
 from transliterate import translit
-from num2words import num2words
+# from num2words import num2words
 # from onnxruntime.capi.onnxruntime_pybind11_state import RuntimeException
 
 from .Raconteur import Raconteur
+
+from .util import translate_numbers
 
 
 RUTTS_MODEL_PATH = './assets/rutts'
@@ -45,9 +47,11 @@ class RuTTS(Raconteur):
 
         # Replace numbers with words
 
-        while (match := NUMBER_PATTERN.search(text)) is not None:
-            number = match.group(0)
-            text = text.replace(number, num2words(number, lang = 'ru'), 1)
+        text = translate_numbers(text)
+
+        # while (match := NUMBER_PATTERN.search(text)) is not None:
+        #     number = match.group(0)
+        #     text = text.replace(number, num2words(number, lang = 'ru'), 1)
 
         # Add accent marks
 

@@ -12,6 +12,12 @@ To generate speech for an arbitrary text, use the following command:
 python -m rr say 'Привет, мир'
 ```
 
+Example of command for **generating an audio book from a txt file**:
+
+```sh
+python -m rr say -e silero -a baya -grx -b 10000 -t assets/player-one.txt
+```
+
 By default [RuTTS toolkit][1] is used, but you can specify other model using `-e` (`--engine`) cli argument:
 
 ```sh
@@ -25,8 +31,19 @@ Currently the following engines are supported:
 1. [salute][4] - adapter to the cloud service from sber, requires environment variable `SALUTE_SPEECH_AUTH` to be set;
 1. [crt][5] - adapter to the cloud service from crt, requires environment variables `CRT_USERNAME`, `CRT_PASSWORD`, `CRT_DOMAIN` to be set;
 1. [coqui][6] - multilingual `xtts` model, utilizes a moderate amount of gpu (much less than [bark][3], but works better), works very slowly (270.43189 seconds per anek in average on gtx 1650 vs 3-5 seconds for rutts), **requires file `assets/female.wav`** which can be downloaded from [here][6] and replaced with desired speaker's voice recording).
+1. [silero][8] - amazing models for speech generation, which produce audio with good quality in a reasonable amount of time without requiring a lot of resources.
 
 For a full list of available cli options see [`__main__.py`][2].
+
+### Add background music to speech
+
+To add background music to speech use `overlay` command:
+
+```sh
+python -m rr overlay "$HOME/Music/sayonara" "$HOME/Downloads/jap.mp3" "$HOME/Music/sayonara-overlay"
+```
+
+here option `-v` (`--volume`) can be used to adjust volume of the background music. The default value is 0.2.
 
 ### Convert anecdotes to voice
 
@@ -84,3 +101,4 @@ python -m unittest discover test
 [5]: https://cloud.speechpro.com/home
 [6]: https://huggingface.co/spaces/coqui/xtts
 [7]: https://github.com/zeionara/carma
+[8]: https://github.com/snakers4/silero-models

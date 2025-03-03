@@ -1,28 +1,46 @@
-from os import path, makedirs, walk
+from os import path, makedirs, listdir
 from time import time
+import math
 from pathlib import Path
+from math import ceil, floor
+import subprocess
+from multiprocessing import Pool, set_start_method  # , Lock
+from functools import partial
 
 from click import group, argument, option, Choice
 from pandas import read_csv
+import numpy as np
+from pydub import AudioSegment
+from music_tag import load_file
 
-from beep import beep
-from cloud_mail_api import CloudMail
-from fuck import ProfanityHandler
+# from beep import beep
+# from cloud_mail_api import CloudMail
+# from fuck import ProfanityHandler
 from tqdm import tqdm
+# import torch
 
 from .Bark import Bark
 from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 from .Coqui import Coqui
+from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read
+from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
 
+from .alternator import _alternate, _alternate_pool_wrapper
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name), case_sensitive = False)
+
+ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+OVERLAY = (
+    'ffmpeg -y -i {input} -i {background} '
+    '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
+    '-map_metadata 0 -metadata TDOR="2023" -metadata date="2023" {output}'
+)
+N_MILLISECONDS_IN_SECOND = 1000
 
 
 @group()
@@ -31,35 +49,159 @@ def main():
 
 
 @main.command()
+@argument('source', type = str)
+@argument('background', type = str)
+@argument('destination', type = str)
+@option('--volume', '-v', type = float, default = 0.2)
+def overlay(source: str, background: str, destination: str, volume: float):
+    offset = 0
+    background_length = floor(len(AudioSegment.from_mp3(background)) / N_MILLISECONDS_IN_SECOND)
+
+    if not path.isdir(destination):
+        makedirs(destination)
+
+    for filename in tqdm(sorted(listdir(source))):
+        file = path.join(source, filename)
+
+        if is_audio(file):
+            source_meta = load_file(file)
+            file_length = ceil(len(AudioSegment.from_mp3(file)) / N_MILLISECONDS_IN_SECOND)
+
+            if offset + file_length > background_length:
+                offset = 0
+
+            overlay_ = OVERLAY.format(
+                input = file,
+                background = background,
+                offset = offset,
+                volume = volume,
+                output = (destination_file := path.join(destination, filename))
+            )
+
+            subprocess.call(overlay_, shell = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+            # subprocess.call(overlay_, shell = True)
+
+            destination_meta = load_file(destination_file)
+
+            destination_meta['lyrics'] = source_meta['lyrics']
+            destination_meta['comment'] = source_meta['comment']
+            # destination_meta['album'] = source_meta['album']
+
+            destination_meta.save()
+
+            offset += file_length
+
+
+@main.command()
+@argument('texts', type = str)
+@argument('output_path', type = str)
+@option('--artist-one', '-a1', help = 'ifrst artist to say the replic', default = 'xenia')
+@option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
+@option('--n-workers', '-w', help = 'how many processes to deploy for mapping the objects', default = 4)
+@option('--limit', '-l', type = int, help = 'how many files to process in total', default = None)
+def iterate(texts: str, output_path: str, artist_one: str, artist_two: str, n_workers: int, limit: int):
+    set_start_method('spawn', force = True)
+
+    def generate_samples():
+        for file in listdir(texts):
+            input_file = path.join(texts, file)
+            output_file = path.join(output_path, f'{path.splitext(file)[0]}.mp3')
+
+            if path.isfile(output_file):
+                continue
+
+            yield (input_file, output_file)
+
+    items = tuple(generate_samples())
+
+    if limit is not None:
+        items = items[:limit]
+
+    print(f'Processing {len(items)} items...')
+
+    # pbar = tqdm(total = len(items))
+
+    # apply = partial(_alternate_pool_wrapper, artist_one = artist_one, artist_two = artist_two, pbar = pbar, lock = lock)
+    apply = partial(_alternate_pool_wrapper, artist_one = artist_one, artist_two = artist_two)
+
+    with Pool(processes = n_workers) as pool:
+        pool.map(apply, items)
+
+    # for inp, outp in generate_samples():
+    #     print(inp, outp)
+    #     return
+
+
+@main.command()
+@argument('text', type = str)  # file must be in a format exported by much module: see https://github.com/zeionara/much
+@option('--artist-one', '-a1', help = 'first artist to say the replic', default = 'xenia')
+@option('--artist-two', '-a2', help = 'second artist to say the replic', default = 'baya')
+def alternate(text: str, artist_one: str, artist_two: str):
+    _alternate(text, artist_one, artist_two)
+
+
+@main.command()
 @argument('text', type = str, required = False)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
 @option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
-@option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = 'assets/speech.mp3')
+@option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = None)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
-def say(text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str):
+@option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
+@option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
+@option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
+@option('--ssml', '-m', help = 'does input text contain ssml tags', is_flag = True)
+@option('--first-batch-index', '-f', help = 'in a multibatch setting from what number to start enumerating the batches', type = int, default = 0)
+@option('--update', '-u', help = 'update existing files instead of generating new ones', is_flag = True)
+def say(
+    text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str,
+    drop_text: bool, batch_size: int, ssml: bool = False, first_batch_index: int = 0, update: bool = True
+):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
         case 1:
             text = read(txt)
 
-    # tts = TTS('tts_models/multilingual/multi-dataset/xtts_v1').to('cuda' if gpu else 'cpu')
+    if batch_size is not None:
+        if destination is None:
+            txt_stem = Path(txt).stem
+            destination = path.join(txt[::-1].split('/', maxsplit = 1)[1][::-1], txt_stem)
 
-    # print(tts.tts(
-    #     text = text,
-    #     speaker_wav = 'assets/female.wav',
-    #     language = 'en'
-    # ))
+            # print(destination)
+            # raise ValueError('Destination name is required when splitting output file')
 
-    # tts.tts_to_file(
-    #     text = text,
-    #     file_path = 'audio.wav',
-    #     speaker_wav = 'assets/female.wav',
-    #     language = 'en'
-    # )
+        n_chunks = first_batch_index + math.ceil(len(text) / batch_size)
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters).speak(text, filename = destination, pbar = True)
-    # RaconteurFactory(gpu, russian).make('crt', max_n_characters).predict(text)
+        # val = input(f'There will be {n_chunks} chunks, ok? (y/N): ')
+
+        # if val != 'y':
+        #     return
+
+        if not path.isdir(destination):
+            makedirs(destination)
+
+        stem = Path(destination).stem
+        batch_index_max_length = len(str(n_chunks))
+        # template = "f'" + path.join(destination, f'{stem}-{{batch:0{batch_index_max_length}d}}.mp3') + "'"
+
+        title = f'{stem}-{{batch:0{batch_index_max_length}d}}'
+        template = path.join(destination, f'{title}.mp3')
+
+        destination = template
+
+        # batch = 8
+        # print(eval(template))
+
+        # print(template.format(batch = 8))
+
+    else:
+        if destination is None:
+            destination = 'assets/speech.mp3'
+        title = None
+
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
+        text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index, title = title, update = update
+    )
 
 
 @main.command()
