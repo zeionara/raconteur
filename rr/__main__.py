@@ -37,6 +37,7 @@ from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
+from .Kokoro import Kokoro
 
 from .RaconteurFactory import RaconteurFactory
 
@@ -50,7 +51,7 @@ filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category 
 
 
 # ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
-ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name, Kokoro.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
@@ -603,7 +604,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 @argument('source', type = str)
 @argument('background', type = str)
 @argument('destination', type = str)
-@option('--volume', '-v', type = float, default = 0.2)
+@option('--volume', '-v', type = float, default = 0.1)
 def overlay(source: str, background: str, destination: str, volume: float):
     offset = 0
     background_length = floor(len(AudioSegment.from_mp3(background)) / N_MILLISECONDS_IN_SECOND)
