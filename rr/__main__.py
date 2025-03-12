@@ -602,6 +602,30 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
 @main.command()
 @argument('source', type = str)
+@option('--title', '-t', type = str)
+@option('--lyrics', '-l', type = str)
+@option('--comment', '-c', type = str)
+@option('--artist', '-a', type = str)
+def annotate(source: str, title: str, lyrics: str, comment: str, artist: str):
+    file = load_file(source)
+
+    if title is not None:
+        file['title'] = title
+
+    if lyrics is not None:
+        file['lyrics'] = lyrics
+
+    if artist is not None:
+        file['artist'] = artist
+
+    if comment is not None:
+        file['comment'] = comment
+
+    file.save()
+
+
+@main.command()
+@argument('source', type = str)
 @argument('background', type = str)
 @argument('destination', type = str)
 @option('--volume', '-v', type = float, default = 0.1)
