@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 
 from scipy.io.wavfile import read as read_wav
+from numpy import float32
 
 from .Raconteur import Raconteur
 
@@ -89,3 +90,7 @@ class SaluteSpeech(Raconteur):
 
     def set_file_meta(self, file):
         file['artist'] = self.artist
+
+    def to_int16(self, data: float32):
+        return data
+        # return (data / np_max(np_abs(data)) * 32767).astype(int16)

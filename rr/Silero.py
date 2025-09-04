@@ -1,6 +1,7 @@
 import torch
 
 from transliterate import translit
+from numpy import float32, int16, max as np_max, abs as np_abs
 # from ruaccent import RUAccent
 
 from .Raconteur import Raconteur
@@ -32,12 +33,15 @@ class Silero(Raconteur):
         # self.accentizer = accentizer = RUAccent(workdir = ACCENTIZER_MODEL_PATH)
         # accentizer.load()
 
-        # model, _ = torch.hub.load(
-        #     repo_or_dir = REPO,
-        #     model = MODEL,
-        #     language = 'ru' if ru else 'en',
-        #     speaker = f'{model}_{language}'
-        # )
+        model, _ = torch.hub.load(
+            repo_or_dir = REPO,
+            model = MODEL,
+            language = 'ru' if ru else 'en',
+            speaker = f'{model}_{self.language}'
+        )
+        model.to(self.device)
+
+        self._model = model
 
         # self.model = model
 
@@ -49,14 +53,15 @@ class Silero(Raconteur):
         #     speaker = self.artist,
         #     sample_rate = self.sample_rate
         # )
-        model, _ = torch.hub.load(
-            repo_or_dir = REPO,
-            model = MODEL,
-            language = self.language,
-            speaker = f'{self.model}_{self.language}'
-        )
 
-        model.to(self.device)
+        # model, _ = torch.hub.load(
+        #     repo_or_dir = REPO,
+        #     model = MODEL,
+        #     language = self.language,
+        #     speaker = f'{self.model}_{self.language}'
+        # )
+
+        # model.to(self.device)
 
         # text = translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
 
@@ -73,7 +78,7 @@ class Silero(Raconteur):
         #     print(text_with_tags)
 
         try:
-            data = model.apply_tts(
+            data = self._model.apply_tts(
                 text = None if ssml else text,
                 ssml_text = text_with_tags if ssml else None,
                 # text = text,
@@ -101,8 +106,14 @@ class Silero(Raconteur):
     def dtype(self):
         return 'float32'
 
+    def to_int16(self, data: float32):
+        return (data / np_max(np_abs(data)) * 32767).astype(int16)
+
     def set_file_meta(self, file):
         file['artist'] = self.artist
 
     def preprocess(self, text: str):
-        return translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        try:
+            return translate_numbers(translit(text, 'ru') if self.language == 'ru' else text, lang = self.language)
+        except KeyError:
+            return translit(text, 'ru') if self.language == 'ru' else text

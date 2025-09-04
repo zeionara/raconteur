@@ -35,15 +35,23 @@ class Raconteur(ABC):
         return audio
 
     def save(self, audio: np.array, filename: str, text: str = None, title: str = None):
-        write_wav(
-            self.tmp_filename,
-            self.sample_rate,
-            audio
-        )
+        # print(audio.dtype)
+        # normalized_audio = audio / np.max(np.abs(audio))
+        # normalized_audio = (normalized_audio * 32767).astype(np.int16)
 
-        AudioSegment.from_wav(self.tmp_filename).export(filename, format = 'mp3')
+        # AudioSegment(normalized_audio.tobytes(), frame_rate = self.sample_rate, sample_width = 2, channels = 1).export(filename, format = 'mp3')
+        AudioSegment(self.to_int16(audio).tobytes(), frame_rate = self.sample_rate, sample_width = 2, channels = 1).export(filename, format = 'mp3')
+        # AudioSegment.from_numpy(audio, frame_rate = self.sample_rate, channels = 1).export(filename, format = 'mp3')
 
-        os.remove(self.tmp_filename)
+        # write_wav(
+        #     self.tmp_filename,
+        #     self.sample_rate,
+        #     audio
+        # )
+
+        # AudioSegment.from_wav(self.tmp_filename).export(filename, format = 'mp3')
+
+        # os.remove(self.tmp_filename)
 
         self.update(filename, text, title)
 
@@ -85,6 +93,9 @@ class Raconteur(ABC):
     def preprocess(self, text: str):
         return text
 
+    def to_int16(self, data):
+        raise NotImplementedError()
+
     def _say(
         self, text: str, pbar: bool = False, accumulator = None, batch_size: int = None, path_template: str = None, first_batch_index: int = 0, title: str = None,
         update: bool = True
@@ -102,7 +113,7 @@ class Raconteur(ABC):
                 try:
                     predictions = self.predict(chunk)
                 # except ValueError:
-                except OSError:
+                except (OSError, KeyboardInterrupt):
                     raise
                 except:
                     print(format_exc())

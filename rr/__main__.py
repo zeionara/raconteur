@@ -1,11 +1,16 @@
-from os import path, makedirs, listdir
-from time import time
+import re
+from os import path, makedirs, listdir, environ as env, stat
+import asyncio
+from time import time, sleep
 import math
 from pathlib import Path
 from math import ceil, floor
 import subprocess
 from multiprocessing import Pool, set_start_method  # , Lock
 from functools import partial
+from traceback import format_exc
+from warnings import filterwarnings
+from requests import get
 
 from click import group, argument, option, Choice
 from pandas import read_csv
@@ -18,23 +23,35 @@ from music_tag import load_file
 # from fuck import ProfanityHandler
 from tqdm import tqdm
 # import torch
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import NetworkError
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults, ConversationHandler, CallbackQueryHandler, CallbackContext
+from telegram.warnings import PTBUserWarning
 
-from .Bark import Bark
-from .RuTTS import RuTTS
+from much import Fetcher, Exporter, Format, normalize
+from karma import CloudMail
+
+# from .Bark import Bark
+# from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
-from .Coqui import Coqui
+# from .Coqui import Coqui
 from .Silero import Silero
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read, is_audio  # , drop_accent_marks, drop_empty_lines
+from .util import one_is_not_none, read, is_audio, is_image, is_video, post_process_summary, truncate_translation  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
+from .HuggingFaceClient import HuggingFaceClient, Task
 
 from .alternator import _alternate, _alternate_pool_wrapper
+from .Thread import Thread
+
+filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category = PTBUserWarning)
 
 
-ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+# ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
@@ -42,10 +59,639 @@ OVERLAY = (
 )
 N_MILLISECONDS_IN_SECOND = 1000
 
+TELEGRAM_TOKEN_ENV = 'RACONTEUR_BOT_TOKEN'
+CHAT_ID_ENV = 'MY_CHAT_ID'
+
+KARMA_USERNAME_ENV = 'KARMA_USERNAME'
+KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
+KARMA_AUTH_TIMEOUT = 1800  # seconds
+
+CATALOG_URL = 'https://2ch.hk/b/catalog.json'
+N_TOP_THREADS = 50
+SPEAK_CALL_DELAY = 0
+
+FILENAME = 'filename'
+BUTTON = 'button'
+
+NEXT_BUTTON = 'next-button'
+NEXT = 'next'
+PREVIOUS = 'previous'
+THREAD = 'thread'
+CANCEL = 'cancel'
+KEEP = 'keep'
+CLEAR = 'clear'
+TAKE = 'take'
+
+URL_REGEXP = re.compile('http.+')
+MAX_URL_LENGTH = 92
+
+NEWLINE = '\n'
+MIN_SUMMARY_LENGTH = 40
+
 
 @group()
 def main():
     pass
+
+
+@main.command()
+@argument('assets', type = str, default = '/tmp')
+@option('--cloud', '-c', help = 'path to remote folder in mail ru cloud for uploading generated audio files', type = str, default = None)
+@option('--alternation-list-path', '-a', help = 'path to the file with an alternation list', type = str)
+@option('--alternation-target', '-t', help = 'Path to folder with alternated mp3 files', type = str)
+@option('--hf-cache', type = str)
+def start(assets: str, cloud: str, alternation_list_path: str, alternation_target: str, hf_cache: str):
+    # response = get(CATALOG_URL)
+
+    # if (status_code := response.status_code) != 200:
+    #     raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
+
+    # threads = sorted(Thread.from_list(response.json()['threads']), key = lambda thread: thread.length, reverse = True)[:N_TOP_THREADS]
+    # for thread in threads:
+    #     print(thread)
+
+    # return
+
+    token = env.get(TELEGRAM_TOKEN_ENV)
+    chat_id = env.get(CHAT_ID_ENV)
+
+    alternated_list = None if alternation_list_path is None else []
+    alternated_list_lock = None if alternated_list is None else asyncio.Lock()
+
+    summarization_client = HuggingFaceClient(hf_cache = hf_cache, local = True, device = 0)
+    translation_client = HuggingFaceClient(model = 'Helsinki-NLP/opus-mt-ru-en', task = Task.TRANSLATION, local = True, hf_cache = hf_cache, device = 0)
+
+    if cloud is not None:
+        karma_username = env.get(KARMA_USERNAME_ENV)
+        karma_password = env.get(KARMA_PASSWORD_ENV)
+
+        if karma_username is None or karma_password is None:
+            raise ValueError(f'Environment variables {KARMA_USERNAME_ENV} and {KARMA_PASSWORD_ENV} must be set')
+
+        uploader = CloudMail(karma_username, karma_password)
+        uploader.auth()
+        last_auth_timestamp = time()
+    else:
+        uploader = None
+        last_auth_timestamp = None  # time()
+
+    if not path.isdir(assets):
+        makedirs(assets)
+
+    fetcher = Fetcher()
+    exporter = Exporter()
+
+    if token is None:
+        raise ValueError(f'Environment variable {TELEGRAM_TOKEN_ENV} must be defined')
+
+    if chat_id is None:
+        raise ValueError(f'Environment variable {CHAT_ID_ENV} must be defined')
+    else:
+        chat_id = int(chat_id)
+
+    def get_threads(reverse: bool = True):
+        response = get(CATALOG_URL, timeout = 60)
+
+        if (status_code := response.status_code) != 200:
+            raise ValueError(f'Can\'t pull threads, response status code is {status_code}')
+
+        return sorted(Thread.from_list(response.json()['threads']), key = lambda thread: (thread.length, thread.freshness), reverse = reverse)
+
+    async def _keep(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        return await _next(update, context, delete_last = False)
+
+    async def _tail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        return await _next(update, context, reverse = True)
+
+    async def _next(update: Update, context: ContextTypes.DEFAULT_TYPE, delete_last: bool = True, reverse: bool = False) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        keyboard_line = [
+            # InlineKeyboardButton('speak', callback_data = THREAD),
+            InlineKeyboardButton('keep', callback_data = KEEP),
+            InlineKeyboardButton('quit', callback_data = CANCEL),
+            InlineKeyboardButton('clear', callback_data = CLEAR)
+        ]
+        movement_line = []
+
+        thread_index = context.user_data.get('thread_index')
+
+        if thread_index is None:
+            offset = None
+
+            if update.message is not None:
+                message_parts = normalize(message := update.message.text).split(' ')
+
+                if (n_message_parts := len(message_parts)) > 1:
+                    if n_message_parts < 3:
+                        try:
+                            offset = int(message_parts[1])
+                        except ValueError:
+                            await user.send_message(f'Incorrect offset: {message_parts[1]}')
+                            return
+                    else:
+                        await user.send_message(f'Too many arguments in the call: {message}')
+                        return
+
+            context.user_data['threads'] = threads = get_threads(not reverse)
+            thread_index = 0 if offset is None else offset
+            context.user_data['reverse'] = reverse
+
+            # summaries = [post_process_summary(summary) for summary in summarization_client.infer_many([thread.title_text for thread in threads])]
+            # context.user_data['filenames'] = filenames = [truncate_translation(translation) for translation in translation_client.infer_many(summaries)]
+        else:
+            # reverse = context.user_data['reverse']
+            thread_index += 1
+            threads = context.user_data['threads']
+            # filenames = context.user_data['filenames']
+
+        if thread_index > 0:
+            movement_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *movement_line]
+
+        if thread_index < len(threads) - 1:
+            movement_line = [InlineKeyboardButton('next', callback_data = NEXT), *movement_line]
+
+        if thread_index >= len(threads):
+            await user.send_message('No more threads')
+
+            # context.user_data.pop('thread_index')
+            # context.user_data.pop('threads')
+            # context.user_data.pop('last_thread_description_message_id')
+
+            # return ConversationHandler.END
+            return NEXT_BUTTON
+
+        if (message_id := context.user_data.get('last_thread_description_message_id')) is not None and delete_last:
+            await context.bot.delete_message(message_id = message_id, chat_id = user.id)
+
+        context.user_data['thread_index'] = thread_index
+
+        thread = threads[thread_index]
+        # filename = filenames[thread_index]
+        try:
+            context.user_data['proposed_filename'] = filename = truncate_translation(
+                translation_client.infer_one(
+                    thread.title if len(thread.title) <= MIN_SUMMARY_LENGTH else post_process_summary(summarization_client.infer_one(thread.title))
+                )
+            )
+        except:
+            context.user_data['proposed_filename'] = filename = None
+
+        if filename is not None:
+            keyboard_line.append(InlineKeyboardButton('take', callback_data = TAKE))
+
+        buttons = InlineKeyboardMarkup(
+            [
+                keyboard_line,
+                movement_line
+            ]
+        )
+
+        # message_text = f'{thread.title.replace("<br>", "<br/>")}<br/><br/><b>Length: {thread.length}</b><br/><b>Freshness: {thread.freshness}%</b>'
+
+        files = thread.files
+
+        message_text = (
+            f'{thread.link}\n\n{thread.title_text}\n\n{thread.links}\n\n'
+            f'**Proposed filename**: `{"<filename generation error>" if filename is None else filename}`\n\n'
+            f'**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**'
+        )
+
+        for match in URL_REGEXP.findall(message_text):
+            if len(match) > MAX_URL_LENGTH:
+                message_text = message_text.replace(match, match[:MAX_URL_LENGTH])
+
+        def cut_message(message: str):
+            return message[:4096].replace('_', '\\_')
+
+        try:
+            if len(files) > 0 and len(message_text) <= 1024:
+                file = files[0].link
+                try:
+                    if is_image(file):
+                        message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    elif is_video(file):
+                        message = await user.send_video(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                    else:
+                        message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
+                except:
+                    print(format_exc())
+                    message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
+            else:
+                message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
+        except:
+            message = await user.send_message(
+                f'Thread {thread.link} is not supported\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**',
+                reply_markup = buttons,
+                parse_mode = 'Markdown'
+            )
+
+        context.user_data['last_thread_description_message_id'] = message.message_id
+
+        return NEXT_BUTTON
+
+    async def _previous(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if (thread_index := context.user_data.get('thread_index')) is None:
+            raise ValueError('Missing thread index. Can\'t go back')
+
+        if thread_index < 1:
+            await user.send_message('No previous threads')
+
+            return NEXT_BUTTON
+
+        # reverse = context.user_data['reverse']
+        context.user_data['thread_index'] = thread_index - 2
+
+        return await _next(update, context)
+
+    async def _next_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        data = update.callback_query.data
+
+        match data:
+            case 'next':
+                return await _next(update, context)
+            case 'thread':
+                return await _thread(update, context)
+            case 'cancel':
+                return await _next_cancel(update, context)
+            case 'previous':
+                return await _previous(update, context)
+            case 'keep':
+                return await _keep(update, context)
+            case 'take':
+                return await _take(update, context)
+            case 'clear':
+                if (message_id := context.user_data.get('last_thread_description_message_id')) is not None:
+                    await context.bot.delete_message(message_id = message_id, chat_id = user.id)
+                return await _next_cancel(update, context, quiet = True)
+            case _:
+                raise ValueError(f'Unsupported context data: {data}')
+
+    async def _thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
+        await user.send_message(f'You have selected thread {context.user_data["thread_index"]}, now send me the filename')
+
+        return FILENAME
+
+    async def _take(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
+        thread_id = context.user_data['threads'][context.user_data['thread_index']].id
+        text = context.user_data['proposed_filename']
+
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = SPEAK_CALL_DELAY)
+        # context.job_queue.run_once(speak, when = 0, job_kwargs = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True})
+        context.job_queue.run_once(
+            speak_job,
+            data = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True},
+            job_kwargs={"misfire_grace_time": None},
+            when = SPEAK_CALL_DELAY
+        )
+
+        return await _next(update, context)
+
+    async def _next_filename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        # await user.send_message(f'Perfect, your thread is {context.user_data["thread_index"]} and your filename is {update.message.text}. Generating the speech...')
+        # await asyncio.get_event_loop().run_in_executor(None, lambda: speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text))
+        # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+        # await speak(user, context.user_data['threads'][context.user_data['thread_index']].id, update.message.text)
+
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
+        thread_id = context.user_data['threads'][context.user_data['thread_index']].id
+        text = update.message.text
+
+        # if (alternated_list := context.user_data.get('alternated_list')) is None:
+        #     context.user_data['alternated_list'] = alternated_list = []
+
+        # print('alternated list:', alternated_list)
+
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True, alternated_list = alternated_list), when = 0)
+        # context.job_queue.run_once(lambda _: speak(user, thread_id, text, quiet = True), when = SPEAK_CALL_DELAY)
+        context.job_queue.run_once(
+            speak_job,
+            data = {'user': user, 'thread_id': thread_id, 'thread_title': text, 'quiet': True},
+            job_kwargs={"misfire_grace_time": None},
+            when = SPEAK_CALL_DELAY
+        )
+
+        return await _next(update, context)
+
+    async def _next_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, quiet: bool = False) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        if not quiet:
+            await user.send_message('Cancelling the iteration over threads')
+
+        if 'thread_index' in context.user_data:
+            context.user_data.pop('thread_index')
+        if 'threads' in context.user_data:
+            context.user_data.pop('threads')
+        if 'last_thread_description_message_id' in context.user_data:
+            context.user_data.pop('last_thread_description_message_id')
+
+        return ConversationHandler.END
+
+    async def _top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        try:
+            top_n = int(update.message.text[::-1].split(' ', maxsplit = 1)[0][::-1])
+        except ValueError:
+            top_n = N_TOP_THREADS
+
+        # keyboard = [
+        #     [
+        #         InlineKeyboardButton('Option 1', callback_data = '1'),
+        #         InlineKeyboardButton('Option 2', callback_data = '2')
+        #     ],
+        #     [
+        #         InlineKeyboardButton('Option 3', callback_data = '3')
+        #     ]
+        # ]
+
+        keyboard = [
+            [
+                InlineKeyboardButton(f'[{thread.length}] {{{thread.freshness:.2f}}} {thread.header}', callback_data = thread.id)
+            ]
+            for thread in get_threads()[:top_n]
+        ]
+
+        markup = InlineKeyboardMarkup(keyboard)
+
+        # await user.send_message(f'Here will be a menu for choosing a right thread out of top {top_n} threads. Now please send a filename')
+
+        await update.message.reply_text('Please, choose thread to generate speech for:', reply_markup = markup)
+
+        return BUTTON
+
+    async def _button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        query = update.callback_query
+        context.user_data['thread_id'] = query.data
+
+        # await user.send_message(f'Ok, called button handler for option {query.data}')
+        await user.send_message('Ok, now please send me the filename')
+
+        return FILENAME
+
+    async def _filename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        message = update.message.text
+        # await user.send_message(f'Fine, got your file name. Saving thread {context.user_data["thread_id"]} as "{message}"')
+        await speak(user, context.user_data['thread_id'], message)
+
+        return ConversationHandler.END
+
+    async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        await user.send_message('Cancelling the last operation')
+
+        return ConversationHandler.END
+
+    async def speak_job(context: CallbackContext):
+        return await speak(**context.job.data)
+
+    # async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False, alternated_list: list = None):
+    async def speak(user, thread_id: int, thread_title: str, url = None, quiet: bool = False):
+        nonlocal last_auth_timestamp
+
+        # await asyncio.sleep(5)
+        # await user.send_message('Has slept enough')
+
+        # return
+
+        if not quiet:
+            await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
+
+        if url is None:
+            url = f'https://2ch.hk/b/res/{thread_id}.html'
+
+        filename = thread_id if thread_title is None else thread_title.lower().replace(' ', '-')
+
+        if alternated_list is not None:
+            async with alternated_list_lock:
+                alternated_list.append((user.id, f'{filename}'))
+
+        text_path = path.join(assets, f'{filename}-snapshot.txt')
+        audio_path = path.join(assets, f'{filename}-snapshot.mp3')
+
+        if not path.isfile(text_path):
+            print(f'Pulling url {url}...')
+
+            exporter.export(fetcher.fetch(url), Format.TXT, text_path)
+
+            print(f'Pulled {url} to {text_path}. Generating speech...')
+
+        if stat(text_path).st_size == 0:
+            await user.send_message(f'Thread {thread_id} does not exist')
+        else:
+            if not path.isfile(audio_path):
+                if alternation_list_path is not None:
+                    with open(alternation_list_path, 'a', encoding = 'utf-8') as file:
+                        file.write(f'{thread_id} {filename}{NEWLINE}')
+
+                try:
+                    # raise ValueError('test')
+                    await asyncio.get_event_loop().run_in_executor(None, lambda: _alternate(text_path, artist_one = 'xenia', artist_two = 'baya'))
+                except:
+                    await user.send_message(f'There was an internal error:\n\n```{format_exc()}```\nPlease try again', parse_mode = 'Markdown')
+                    return
+
+            with open(audio_path, 'rb') as audio_file:
+                try:
+                    await user.send_audio(audio_file, title = thread_title)
+                except NetworkError:
+                    await user.send_message(f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again", parse_mode = 'Markdown')
+
+            # print(time() - last_auth_timestamp)
+
+            if uploader is not None:
+                if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
+                    uploader.auth()
+                    last_auth_timestamp = current_time
+
+                response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
+
+                print('File uploading result:')
+                print(response)
+
+                if response['status'] != 200:
+                    await user.send_message(f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
+
+    async def _speak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        # await update.effective_user.send_message(f'Started handling message {update.message.text}')
+        # # print(f'Started handling message {update.message.text}')
+
+        # await asyncio.sleep(5)
+
+        # # await update.effective_user.send_message(f'Stopped handling message {update.message.text}')
+        # print(f'Stopped handling message {update.message.text}')
+
+        user = update.effective_user
+
+        if user.id != chat_id:
+            return
+
+        message = update.message.text
+        # parts = normalize(message.replace('/speak', '').replace('/s', '').strip()).split(' ', maxsplit = 1)
+        parts = normalize(message.strip()).split(' ', maxsplit = 1)
+
+        thread_id = parts[0]
+        url = None
+
+        if len(parts) > 1:
+            thread_title = parts[1]
+        else:
+            thread_title = None
+
+        if thread_id.startswith('http'):
+            url = thread_id
+            thread_id = Path(url).stem
+
+        try:
+            thread_id = int(thread_id)
+        except ValueError:
+            await user.send_message(f'Unsupported thread id: {thread_id}')
+            return
+
+        await speak(user, thread_id, thread_title, url)
+
+    bot = ApplicationBuilder().token(token).defaults(Defaults(block = False)).build()
+
+    bot.add_handler(
+        ConversationHandler(
+            entry_points = [CommandHandler('top', _top)],
+            states = {
+                BUTTON: [CallbackQueryHandler(_button)],
+                FILENAME: [MessageHandler(~filters.COMMAND, _filename)]
+            },
+            fallbacks = [CommandHandler('cancel', _cancel)]
+        )
+    )
+
+    bot.add_handler(
+        ConversationHandler(
+            entry_points = [CommandHandler('next', _next), CommandHandler('tail', _tail)],
+            states = {
+                NEXT: [CallbackQueryHandler(_next)],
+                NEXT_BUTTON: [CallbackQueryHandler(_next_button), MessageHandler(~filters.COMMAND, _next_filename)],
+                # THREAD: [CallbackQueryHandler(_thread)],
+                FILENAME: [MessageHandler(~filters.COMMAND, _next_filename)]
+            },
+            fallbacks = [CommandHandler('cancel', _next_cancel)]
+        )
+    )
+
+    async def check_alternation_status(context: ContextTypes.DEFAULT_TYPE):
+        nonlocal last_auth_timestamp
+
+        # alternated_list = context.user_data.get('alternated_list')
+
+        # print(dir(context))
+
+        # print('checking alternation status, alternated list:', alternated_list)
+
+        print('Checking alternated list')
+        # print(alternated_list)
+
+        if alternated_list is not None:
+            for element in list(alternated_list):
+                user_id, item = element
+
+                audio_path = path.join(alternation_target, f'{item}.mp3')
+
+                # print('checking file', audio_path)
+                # print(path.isfile(audio_path))
+
+                if path.isfile(audio_path):
+                    with open(audio_path, 'rb') as audio_file:
+                        try:
+                            await context.bot.send_audio(user_id, audio_file, title = item.replace('-', ' '))
+                        except NetworkError:
+                            await context.bot.send_message(
+                                user_id,
+                                f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again",
+                                parse_mode = 'Markdown'
+                            )
+
+                    if uploader is not None:
+                        if ((current_time := time()) - last_auth_timestamp) > KARMA_AUTH_TIMEOUT:
+                            uploader.auth()
+                            last_auth_timestamp = current_time
+
+                        response = uploader.api.file.add(audio_path, path.join(cloud, path.basename(audio_path)))
+
+                        print('File uploading result:')
+                        print(response)
+
+                        if response['status'] != 200:
+                            await context.bot.send_message(user_id, f'There was an internal error when pushing the generated audio file to cloud:\n\n```{response}```', parse_mode = 'Markdown')
+
+                    async with alternated_list_lock:
+                        alternated_list.remove(element)
+
+    if alternation_target is not None:
+        bot.job_queue.run_repeating(check_alternation_status, interval = 3600, first = 600)
+
+    # bot.add_handler(CommandHandler('speak', _speak))
+    # bot.add_handler(CommandHandler('s', _speak))
+    # bot.add_handler(MessageHandler(filters.Regex(re.compile('http.+', re.IGNORECASE)), _speak))
+
+    bot.add_handler(MessageHandler(filters.ALL, _speak))
+
+    print('Started telegram bot')
+    bot.run_polling()
 
 
 @main.command()
@@ -144,7 +790,7 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @argument('text', type = str, required = False)
 @option('--max-n-characters', '-c', help = 'max number of characters given to the speech engine at once', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Silero.name)
 @option('--destination', '-d', help = 'path to the resulting mp3 file', type = str, default = None)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
@@ -197,6 +843,10 @@ def say(
     else:
         if destination is None:
             destination = 'assets/speech.mp3'
+
+        if not path.isdir('assets'):
+            makedirs('assets')
+
         title = None
 
     RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
@@ -234,7 +884,7 @@ def make_changelog(source: str, destination: str, output: str):
 @option('--top-n', '-n', help = 'number of entries to handle', type = int, default = None)
 @option('--offset', '-o', help = 'number of entries in the beginning to skip', type = int, default = None)
 @option('--gpu', '-g', help = 'run model using gpu', is_flag = True)
-@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = RuTTS.name)
+@option('--engine', '-e', help = 'speaker type to use', type = ENGINES, default = Silero.name)
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--skip-if-exists', '-k', help = 'skip anek if audio file with the same name already exists', is_flag = True)
 @option('--username', '-u', help = 'cloud mail ru username', type = str)
