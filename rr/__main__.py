@@ -208,11 +208,11 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             threads = context.user_data['threads']
             # filenames = context.user_data['filenames']
 
-        if thread_index > 0:
-            movement_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *movement_line]
-
         if thread_index < len(threads) - 1:
             movement_line = [InlineKeyboardButton('next', callback_data = NEXT), *movement_line]
+
+        if thread_index > 0:
+            movement_line = [InlineKeyboardButton('prev', callback_data = PREVIOUS), *movement_line]
 
         if thread_index >= len(threads):
             await user.send_message('No more threads')
