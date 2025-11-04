@@ -13,7 +13,7 @@ import numpy as np
 from pydub import AudioSegment
 from music_tag import load_file
 
-# from beep import beep
+from beep import beep
 # from cloud_mail_api import CloudMail
 # from fuck import ProfanityHandler
 from tqdm import tqdm
@@ -268,10 +268,13 @@ def handle_aneks(
         with open(changelog, 'r', encoding = 'utf-8') as file:
             changelog = set(line[:-1] for line in file.readlines())
 
+        n_aneks = offset
+
     with beep():
         for _, row in (
-            df
-            if changelog is not None else
+            (
+                df if offset is None else df.iloc[offset:,]
+            ) if changelog is not None else
             (
                 df if offset is None else df.iloc[offset:,]
             )
@@ -331,7 +334,7 @@ def handle_aneks(
 
             print(f'Handled {n_aneks} aneks')
 
-            if changelog is not None and n_aneks > top_n:
+            if changelog is not None and n_aneks >= offset + top_n:
                 break
 
         elapsed = time() - start
