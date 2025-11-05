@@ -784,6 +784,8 @@ def say(
     )
 
 
+# python -m rr handle-aneks -s assets/baneks-default-05.11.2025.tsv -d assets/baneks -e salute -rk
+
 @main.command()
 @option('--source', '-s', help = 'path to the input tsv file with anecdotes', type = str, default = 'assets/anecdotes.tsv')
 @option('--destination', '-d', help = 'path to the output directory with anecdotes', type = str, default = 'assets/anecdotes')
@@ -820,61 +822,65 @@ def handle_aneks(
 
     start = time()
 
-    with beep():
-        for _, row in (
-            (
-                df if offset is None else df.iloc[offset:,]
+    # with beep():
+    for _, row in (
+        (
+            df if offset is None else df.iloc[offset:,]
+        )
+        if top_n is None else
+        (
+            df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
+        )
+    ).loc[:, ('id', 'text', 'source')].iterrows():
+        text = row['text']
+
+        name = f'{row["id"]:08d}.{row["source"]}.mp3'
+        # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
+        filename = path.join(destination, name)
+
+        # print(f'Handling "{text}"')
+        if upload_and_quit and cm is not None and path.isfile(filename):
+            # print(filename, f'{cloud_root}/{name}')
+            status = None
+
+            while status != 200:
+                response = cm.api.file.add(filename, f'{cloud_root}/{name}')
+                status = response['status']
+
+            # response = cm.api.file(f'{cloud_root}/{name}')
+
+            # if response['status'] != 200:
+            #     print(response)
+
+            # cm.api.file.remove(f'{cloud_root}/{name_copy}')
+
+        if not skip_if_exists or not path.isfile(filename):
+            if verbose:
+                print(text)
+
+            # try:
+
+            speaker.speak(
+                text = text,
+                filename = filename
             )
-            if top_n is None else
-            (
-                df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
-            )
-        ).loc[:, ('id', 'text', 'source')].iterrows():
-            text = row['text']
 
-            name = f'{row["id"]:08d}.{row["source"]}.mp3'
-            # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
-            filename = path.join(destination, name)
+            print('Handled', filename)
 
-            # print(f'Handling "{text}"')
-            if upload_and_quit and cm is not None and path.isfile(filename):
-                # print(filename, f'{cloud_root}/{name}')
-                status = None
+            # except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
+            #     sleep(10)
 
-                while status != 200:
-                    response = cm.api.file.add(filename, f'{cloud_root}/{name}')
-                    status = response['status']
+            #     speaker.speak(
+            #         text = text,
+            #         filename = filename
+            #     )
 
-                # response = cm.api.file(f'{cloud_root}/{name}')
+        n_aneks += 1
 
-                # if response['status'] != 200:
-                #     print(response)
+        # print(f'Handled {n_aneks} aneks')
 
-                # cm.api.file.remove(f'{cloud_root}/{name_copy}')
-
-            if not skip_if_exists or not path.isfile(filename):
-                if verbose:
-                    print(text)
-
-                # try:
-                speaker.speak(
-                    text = text,
-                    filename = filename
-                )
-                # except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
-                #     sleep(10)
-
-                #     speaker.speak(
-                #         text = text,
-                #         filename = filename
-                #     )
-
-            n_aneks += 1
-
-            print(f'Handled {n_aneks} aneks')
-
-        elapsed = time() - start
-        print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+    elapsed = time() - start
+    print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
 
 
 @main.command()

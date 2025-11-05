@@ -89,3 +89,6 @@ class SaluteSpeech(Raconteur):
 
     def set_file_meta(self, file):
         file['artist'] = self.artist
+
+    def to_int16(self, data):
+        return data
