@@ -70,9 +70,10 @@ class RaconteurFactory:
                     # repo_id = 'hexgrad/Kokoro-82M-v1.1-zh',
                     repo_id = 'hexgrad/Kokoro-82M',
                     gpu = self.gpu,
-                    artist = 'nicole' if artist is None else artist,
+                    artist = 'nova' if artist is None else artist,
                     gender = 'f',
                     lang_code = 'a',
+                    # speed = 0.75,
                     speed = 0.75,
                     splitter = Splitter(500 if max_n_characters is None else max_n_characters)
                 )
