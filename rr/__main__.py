@@ -37,6 +37,7 @@ from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
+from .Kokoro import Kokoro
 
 from .RaconteurFactory import RaconteurFactory
 
@@ -51,7 +52,7 @@ filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category 
 
 
 # ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
-ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name, Kokoro.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
@@ -696,9 +697,33 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
 
 @main.command()
 @argument('source', type = str)
+@option('--title', '-t', type = str)
+@option('--lyrics', '-l', type = str)
+@option('--comment', '-c', type = str)
+@option('--artist', '-a', type = str)
+def annotate(source: str, title: str, lyrics: str, comment: str, artist: str):
+    file = load_file(source)
+
+    if title is not None:
+        file['title'] = title
+
+    if lyrics is not None:
+        file['lyrics'] = lyrics
+
+    if artist is not None:
+        file['artist'] = artist
+
+    if comment is not None:
+        file['comment'] = comment
+
+    file.save()
+
+
+@main.command()
+@argument('source', type = str)
 @argument('background', type = str)
 @argument('destination', type = str)
-@option('--volume', '-v', type = float, default = 0.2)
+@option('--volume', '-v', type = float, default = 0.1)
 def overlay(source: str, background: str, destination: str, volume: float):
     offset = 0
     background_length = floor(len(AudioSegment.from_mp3(background)) / N_MILLISECONDS_IN_SECOND)
@@ -854,6 +879,8 @@ def say(
     )
 
 
+# python -m rr handle-aneks -s assets/baneks-default-05.11.2025.tsv -d assets/baneks -e salute -rk
+
 @main.command()
 @argument('source', type = str, default = 'assets/default-03.03.2025.tsv')
 @argument('destination', type = str, default = 'assets/speech')
@@ -876,6 +903,7 @@ def make_changelog(source: str, destination: str, output: str):
 
     with open(output, 'w', encoding = 'utf-8') as file:
         file.writelines([line + '\n' for line in new_files])
+
 
 @main.command()
 @option('--source', '-s', help = 'path to the input tsv file with anecdotes', type = str, default = 'assets/anecdotes.tsv')
@@ -914,78 +942,65 @@ def handle_aneks(
 
     start = time()
 
-    if changelog is not None:
-        with open(changelog, 'r', encoding = 'utf-8') as file:
-            changelog = set(line[:-1] for line in file.readlines())
+    # with beep():
+    for _, row in (
+        (
+            df if offset is None else df.iloc[offset:,]
+        )
+        if top_n is None else
+        (
+            df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
+        )
+    ).loc[:, ('id', 'text', 'source')].iterrows():
+        text = row['text']
 
-    with beep():
-        for _, row in (
-            df
-            if changelog is not None else
-            (
-                df if offset is None else df.iloc[offset:,]
+        name = f'{row["id"]:08d}.{row["source"]}.mp3'
+        # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
+        filename = path.join(destination, name)
+
+        # print(f'Handling "{text}"')
+        if upload_and_quit and cm is not None and path.isfile(filename):
+            # print(filename, f'{cloud_root}/{name}')
+            status = None
+
+            while status != 200:
+                response = cm.api.file.add(filename, f'{cloud_root}/{name}')
+                status = response['status']
+
+            # response = cm.api.file(f'{cloud_root}/{name}')
+
+            # if response['status'] != 200:
+            #     print(response)
+
+            # cm.api.file.remove(f'{cloud_root}/{name_copy}')
+
+        if not skip_if_exists or not path.isfile(filename):
+            if verbose:
+                print(f'{name}: {text}')
+
+            # try:
+
+            speaker.speak(
+                text = text,
+                filename = filename
             )
-            if top_n is None else
-            (
-                df.iloc[:top_n,] if offset is None else df.iloc[offset:top_n,]
-            )
-        ).loc[:, ('id', 'text', 'source')].iterrows():
-            text = row['text']
 
-            name = f'{row["id"]:08d}.{row["source"]}'
+            print('Handled', filename)
 
-            print(name)
+            # except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
+            #     sleep(10)
 
-            if changelog is not None and name not in changelog:
-                continue
+            #     speaker.speak(
+            #         text = text,
+            #         filename = filename
+            #     )
 
-            print('--')
+        n_aneks += 1
 
-            # name_copy = f'{row["id"]:08d}.{row["source"]} (1).mp3'
-            filename = path.join(destination, f'{name}.mp3')
+        # print(f'Handled {n_aneks} aneks')
 
-            # print(f'Handling "{text}"')
-            if upload_and_quit and cm is not None and path.isfile(filename):
-                # print(filename, f'{cloud_root}/{name}')
-                status = None
-
-                while status != 200:
-                    response = cm.api.file.add(filename, f'{cloud_root}/{name}.mp3')
-                    status = response['status']
-
-                # response = cm.api.file(f'{cloud_root}/{name}')
-
-                # if response['status'] != 200:
-                #     print(response)
-
-                # cm.api.file.remove(f'{cloud_root}/{name_copy}')
-
-            if not skip_if_exists or not path.isfile(filename):
-                if verbose:
-                    print(text)
-
-                # try:
-                speaker.speak(
-                    text = text,
-                    filename = filename
-                )
-                # except Exception:  # on any exception try to repeat again after 10 seconds, there may be a temporary problem with the network
-                #     sleep(10)
-
-                #     speaker.speak(
-                #         text = text,
-                #         filename = filename
-                #     )
-
-            n_aneks += 1
-
-            print(f'Handled {n_aneks} aneks')
-
-            if changelog is not None and n_aneks > top_n:
-                break
-
-        elapsed = time() - start
-        print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+    elapsed = time() - start
+    print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
 
 
 @main.command()

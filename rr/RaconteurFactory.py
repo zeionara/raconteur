@@ -8,6 +8,7 @@ from .SaluteSpeech import SaluteSpeech
 from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
+from .Kokoro import Kokoro
 
 
 class RaconteurFactory:
@@ -63,6 +64,18 @@ class RaconteurFactory:
                     ru = self.ru,
                     splitter = Splitter(400 if max_n_characters is None else max_n_characters),
                     ssml = ssml
+                )
+            case Kokoro.name:
+                return Kokoro(
+                    # repo_id = 'hexgrad/Kokoro-82M-v1.1-zh',
+                    repo_id = 'hexgrad/Kokoro-82M',
+                    gpu = self.gpu,
+                    artist = 'nova' if artist is None else artist,
+                    gender = 'f',
+                    lang_code = 'a',
+                    # speed = 0.75,
+                    speed = 0.75,
+                    splitter = Splitter(500 if max_n_characters is None else max_n_characters)
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')
