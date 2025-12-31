@@ -4,6 +4,116 @@ An auxiliary tool for simplifying speech generation on arbitrary texts
 
 ## Usage
 
+### Update baneks datasets
+
+#### Update text dataset
+
+1. Pull the marude [repo][marude]:
+
+```sh
+cd $HOME
+git clone git@github.com:zeionara/marude.git
+cd marude
+git submodule update --init --recursive
+```
+
+2. Create and activate environment:
+
+```sh
+conda env create -f environment.yml
+conda activate marude
+python -c 'import nltk; nltk.download("punkt")'
+```
+
+3. Download anecdotes as plain text fragments (set the relevant date instead of `31.12.2025`):
+
+```sh
+./fetch.sh 31.12.2025
+```
+
+4. Pull the dataset [repo][baneks]:
+
+```sh
+cd $HOME
+git clone git@hf.co:datasets/zeio/baneks
+```
+
+5. Copy generated files to `baneks` dataset:
+
+```sh
+cp marude/assets/baneks/31.12.2025/default.tsv baneks
+cp marude/assets/baneks/31.12.2025/inflated.tsv baneks
+cp marude/assets/baneks/31.12.2025/censored.tsv baneks
+```
+
+6. Update dataset version by editing `baneks/README.md`.
+
+7. Upload the changes:
+
+```sh
+cd baneks
+git add -u
+git commit -m 'add(anecdotes): pulled more anecdotes from vk'
+git push
+```
+
+#### Update speech dataset
+
+1. Pull the dataset [repo][baneks-speech]:
+
+```sh
+cd $HOME
+git clone git@hf.co:datasets/zeio/baneks-speech
+```
+
+2. Extract all records to a single folder
+
+```sh
+mkdir baneks-speech-merged
+for file in $(ls ./baneks-speech/speech/*.tar.xz); do echo tar -xJvf $file -C $HOME/baneks-speech-merged; done
+```
+
+3. Pull the raconteur [repo][raconteur]:
+
+```sh
+git clone git@github.com:zeionara/raconteur.git
+```
+
+4. Create conda environment and configure required environment variables:
+
+```sh
+conda env create -f environment.yml
+conda activate raconteur
+export SALUTE_SPEECH_AUTH='salute speech token'
+```
+
+5. Run generation:
+
+```sh
+cd raconteur
+python -m rr handle-aneks -s $HOME/baneks/default.tsv -d $HOME/baneks-speech-merged -e salute -rkv
+```
+
+6. Open directory `$HOME/baneks-speech-merged` in file manager, review generated records, delete irrelevant ones. Then move records which correspond to batches that should be updated, to separate folders, like `$HOME/baneks-speech-040001-041000` and `$HOME/baneks-speech-041001-041555`. The last batch might be incomplete.
+
+7. Generate tar archives from the created folders using command like:
+
+```sh
+tar -cJvf $HOME/baneks-speech/speech/040001-041000.tar.xz -C /home/zeio/raconteur/assets/baneks-speech-040000-041000/ .
+tar -cJvf $HOME/baneks-speech/speech/041001-041555.tar.xz -C /home/zeio/raconteur/assets/baneks-speech-040000-041555/ .
+```
+
+8. Update python script `$HOME/baneks-speech/baneks-speech.py` and `$HOME/baneks-speech/README.md`. Make sure that it contains the correct value of `BaneksSpeech.VERSION` and `_N_TOTAL`.
+
+9. Upload the changes:
+
+```sh
+cd baneks-speech
+git add speech/*.tar.xz
+git commit -m 'feat(aneks): added more anekdotes'
+git push
+```
+
 ### Generate speech for any text
 
 To generate speech for an arbitrary text, use the following command:
@@ -102,3 +212,7 @@ python -m unittest discover test
 [6]: https://huggingface.co/spaces/coqui/xtts
 [7]: https://github.com/zeionara/carma
 [8]: https://github.com/snakers4/silero-models
+[baneks-speech]: https://huggingface.co/datasets/zeio/baneks-speech
+[raconteur]: https://github.com/zeionara/raconteur
+[marude]: https://github.com/zeionara/marude
+[baneks]: https://huggingface.co/datasets/zeio/baneks

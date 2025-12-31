@@ -856,7 +856,7 @@ def handle_aneks(
 
         if not skip_if_exists or not path.isfile(filename):
             if verbose:
-                print(text)
+                print(f'{name}: {text}')
 
             # try:
 
