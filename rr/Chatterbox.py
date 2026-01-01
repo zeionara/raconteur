@@ -33,7 +33,7 @@ class Chatterbox(Raconteur):
 
     def predict(self, text: str):
         if self.language == 'ru':
-            data = self._model.generate(text, language_id = 'ru', audio_prompt_path = self.reference)
+            data = self._model.generate(text, language_id = 'ru', audio_prompt_path = self.reference, exaggeration = 0.25)
         else:
             data = self._model.generate(text, audio_prompt_path = self.reference, cfg_weight = 0.25, exaggeration = 0.25)
 
