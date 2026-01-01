@@ -38,6 +38,7 @@ from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
 from .Kokoro import Kokoro
+from .Chatterbox import Chatterbox
 
 from .RaconteurFactory import RaconteurFactory
 
@@ -52,7 +53,7 @@ filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category 
 
 
 # ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
-ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name, Kokoro.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name, Kokoro.name, Chatterbox.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '
@@ -820,13 +821,14 @@ def alternate(text: str, artist_one: str, artist_two: str):
 @option('--russian', '-r', help = 'is input text in russian language', is_flag = True)
 @option('--txt', '-t', help = 'read text from a plain .txt file located at the given path', type = str, default = None)
 @option('--artist', '-a', help = 'speaker id to use for speech generation', type = str, default = None)
+@option('--reference', help = 'file with reference audio', type = str, default = None)
 @option('--drop-text', '-x', help = 'do not keep source text in generated audio file metadata (for instance, because the text is very long)', is_flag = True)
 @option('--batch-size', '-b', help = 'number of characters per generated audio file', type = int, default = None)
 @option('--ssml', '-m', help = 'does input text contain ssml tags', is_flag = True)
 @option('--first-batch-index', '-f', help = 'in a multibatch setting from what number to start enumerating the batches', type = int, default = 0)
 @option('--update', '-u', help = 'update existing files instead of generating new ones', is_flag = True)
 def say(
-    text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str,
+    text: str, max_n_characters: int, gpu: bool, engine: str, destination: str, russian: bool, txt: str, artist: str, reference: str,
     drop_text: bool, batch_size: int, ssml: bool = False, first_batch_index: int = 0, update: bool = True
 ):
     match one_is_not_none('Exactly one of input text, path to txt file must be specified', text, txt):
@@ -874,7 +876,7 @@ def say(
 
         title = None
 
-    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, ssml).speak(
+    RaconteurFactory(gpu, russian).make(engine, max_n_characters, artist, reference, ssml).speak(
         text, filename = destination, pbar = True, save_text = not drop_text, batch_size = batch_size, first_batch_index = first_batch_index, title = title, update = update
     )
 

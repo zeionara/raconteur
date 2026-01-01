@@ -9,6 +9,7 @@ from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
 from .Kokoro import Kokoro
+from .Chatterbox import Chatterbox
 
 
 class RaconteurFactory:
@@ -16,7 +17,7 @@ class RaconteurFactory:
         self.gpu = gpu
         self.ru = ru
 
-    def make(self, engine: str, max_n_characters: int = None, artist: str = None, ssml: bool = False):
+    def make(self, engine: str, max_n_characters: int = None, artist: str = None, reference: str = None, ssml: bool = False):
         match engine:
             case SaluteSpeech.name:
                 return SaluteSpeech(
@@ -76,6 +77,13 @@ class RaconteurFactory:
                     # speed = 0.75,
                     speed = 0.75,
                     splitter = Splitter(500 if max_n_characters is None else max_n_characters)
+                )
+            case Chatterbox.name:
+                return Chatterbox(
+                    splitter = Splitter(500 if max_n_characters is None else max_n_characters),
+                    gpu = self.gpu,
+                    ru = self.ru,
+                    reference = reference
                 )
             case _:
                 raise ValueError(f'Unknown engine {engine}')
