@@ -114,11 +114,12 @@ python -m rr handle-aneks -s $HOME/baneks/default.tsv -d $HOME/baneks-speech-mer
 
 6. Open directory `$HOME/baneks-speech-merged` in file manager, review generated records, delete irrelevant ones. Then move records which correspond to batches that should be updated, to separate folders, like `$HOME/baneks-speech-040001-041000` and `$HOME/baneks-speech-041001-041555`. The last batch might be incomplete.
 
-7. Generate tar archives from the created folders using command like:
+7. Generate tar archives from the created folders using script inside `baneks-speech` project:
 
 ```sh
-tar -cJvf $HOME/baneks-speech/speech/040001-041000.tar.xz -C /home/zeio/raconteur/assets/baneks-speech-040000-041000/ .
-tar -cJvf $HOME/baneks-speech/speech/041001-041555.tar.xz -C /home/zeio/raconteur/assets/baneks-speech-040000-041555/ .
+cd $HOME/baneks-speech
+mv speech deprecated || echo 'Directory speech does not exist'
+python make-batches.py $HOME/baneks-speech-merged speech
 ```
 
 8. Update python script `$HOME/baneks-speech/baneks-speech.py` and `$HOME/baneks-speech/README.md`. Make sure that it contains the correct value of `BaneksSpeech.VERSION` and `_N_TOTAL`.
