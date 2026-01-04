@@ -21,7 +21,7 @@ POST_PARAGRAPH_PAUSE_LENGTH = 50_000
 class Silero(Raconteur):
     name = 'silero'
 
-    def __init__(self, model: str = 'v4', gpu: bool = True, artist: str = 'xenia', ru: bool = True, ssml: bool = False, *args, **kwargs):
+    def __init__(self, model: str = 'v5', gpu: bool = True, artist: str = 'xenia', ru: bool = True, ssml: bool = False, *args, **kwargs):
         self.model = model
         self.artist = artist
 
