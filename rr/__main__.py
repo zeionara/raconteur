@@ -24,7 +24,7 @@ from music_tag import load_file
 from tqdm import tqdm
 # import torch
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import NetworkError
+from telegram.error import NetworkError, TimedOut
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Defaults, ConversationHandler, CallbackQueryHandler, CallbackContext
 from telegram.warnings import PTBUserWarning
 
