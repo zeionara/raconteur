@@ -273,12 +273,22 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             if len(files) > 0 and len(message_text) <= 1024:
                 file = files[0].link
                 try:
-                    if is_image(file):
-                        message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
-                    elif is_video(file):
-                        message = await user.send_video(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
-                    else:
-                        message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
+                    n_attempts = 10
+
+                    while True:
+                        try:
+                            if is_image(file):
+                                message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                            elif is_video(file):
+                                message = await user.send_video(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                            else:
+                                message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
+                            break
+                        except TimedOut:
+                            if n_attempts > 0:
+                                n_attempts -= 1
+                            else:
+                                raise
                 except:
                     print(format_exc())
                     message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')

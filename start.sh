@@ -33,4 +33,4 @@ cd $PROJECT_ROOT
 conda run -n raconteur --no-capture-output \
     python -m rr start $SNAPSHOTS_PATH \
         --alternation-list-path $DATASET_ROOT/index.txt \
-        --alternation-target $DATASET_ROOT/threads >> $PROJECT_ROOT/assets/logs/start.txt 2>&1
+        --alternation-target $DATASET_ROOT/threads >> $LOG_FILE 2>&1
