@@ -68,7 +68,7 @@ KARMA_USERNAME_ENV = 'KARMA_USERNAME'
 KARMA_PASSWORD_ENV = 'KARMA_PASSWORD'
 KARMA_AUTH_TIMEOUT = 1800  # seconds
 
-CATALOG_URL = 'https://2ch.hk/b/catalog.json'
+CATALOG_URL = 'https://2ch.org/b/catalog.json'
 N_TOP_THREADS = 50
 SPEAK_CALL_DELAY = 0
 
@@ -517,7 +517,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             await user.send_message(f'Generating speech for thread {thread_id}. Please wait')
 
         if url is None:
-            url = f'https://2ch.hk/b/res/{thread_id}.html'
+            url = f'https://2ch.org/b/res/{thread_id}.html'
 
         filename = thread_id if thread_title is None else thread_title.lower().replace(' ', '-')
 
@@ -525,8 +525,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
             async with alternated_list_lock:
                 alternated_list.append((user.id, f'{filename}'))
 
-        text_path = path.join(assets, f'{filename}-snapshot.txt')
-        audio_path = path.join(assets, f'{filename}-snapshot.mp3')
+        text_path = path.join(assets, f'{filename}.txt')
+        audio_path = path.join(assets, f'{filename}.mp3')
 
         if not path.isfile(text_path):
             print(f'Pulling url {url}...')
