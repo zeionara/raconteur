@@ -1,24 +1,21 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-if test -z "$CONDA_ROOT"; then
-    if test -d "$HOME/miniconda3"; then
-        CONDA_ROOT="$HOME/miniconda3"
-    elif test -d "$HOME/anaconda3"; then
-        CONDA_ROOT="$HOME/anaconda3"
-    else
-        echo "Can't infer conda installation root"
-        exit 1
-    fi
-fi
+conda create -n raconteur 'python<3.12' -y
 
-echo "Using conda at $CONDA_ROOT"
+conda run -n much --no-capture-output pip install chatterbox-tts
+conda run -n much --no-capture-output pip install kokoro
+conda run -n much --no-capture-output pip install ipython
+conda run -n much --no-capture-output pip install music-tag
+conda run -n much --no-capture-output pip install num2words
+conda run -n much --no-capture-output pip install transliterate
+conda run -n much --no-capture-output pip install python-telegram-bot
 
-source "$CONDA_ROOT/etc/profile.d/conda.sh"
+# much deps
 
-conda create --name raconteur python=3.11.5
-conda activate raconteur
+conda run -n much --no-capture-output pip install beautifulsoup4
 
-conda install click pandas numpy tqdm scipy ipython requests pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch-nightly -c nvidia
-pip install music-tag pydub num2words transliterate omegaconf 'python-telegram-bot[job-queue]' beautifulsoup4
+git submodule update --init
+
+sudo bash -c 'apt-get update && apt-get install ffmpeg -y'
