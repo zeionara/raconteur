@@ -22,6 +22,8 @@ class Silero(Raconteur):
     name = 'silero'
 
     def __init__(self, model: str = 'v5', gpu: bool = True, artist: str = 'xenia', ru: bool = True, ssml: bool = False, *args, **kwargs):
+        print(f'Using silero model {model}')
+
         self.model = model
         self.artist = artist
 

@@ -57,7 +57,7 @@ class RaconteurFactory:
             #     )
             case Silero.name:
                 return Silero(
-                    model = 'v4' if self.ru else 'v3',
+                    model = 'v5' if self.ru else 'v3',
                     gpu = self.gpu,
                     # artist = ('xenia' if self.ru else 'en_12') if artist is None else artist,
                     # artist = ('xenia' if self.ru else 'en_21') if artist is None else artist,
