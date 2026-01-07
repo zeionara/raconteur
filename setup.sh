@@ -19,6 +19,11 @@ conda run -n much --no-capture-output pip install sentencepiece
 
 conda run -n much --no-capture-output pip install beautifulsoup4
 
+# much deps, which are required to run much/alternate.sh
+
+conda run -n much --no-capture-output pip install flask
+conda run -n much --no-capture-output pip install google-images-search
+
 git submodule update --init
 
 sudo bash -c 'apt-get update && apt-get install ffmpeg -y'
