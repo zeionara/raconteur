@@ -13,6 +13,8 @@ LOG_FILE=$LOG_ROOT/start.txt
 SNAPSHOTS_PATH=$DATASET_ROOT/shapshots
 THREADS_PATH=$DATASET_ROOT/threads
 
+export PYTHONUNBUFFERED=True
+
 if test ! -d $SNAPSHOTS_PATH; then
   mkdir -p $SNAPSHOTS_PATH
 fi
@@ -28,9 +30,15 @@ fi
 . "$CONDA_ROOT/etc/profile.d/conda.sh"
 . /home/zeio/bashrc/creds/personal.sh
 
+if test -f $LOG_FILE; then
+  echo >> $LOG_FILE
+fi
+
+date +"%Y-%m-%d %H:%M:%S" >> $LOG_FILE
+
 cd $PROJECT_ROOT
 
 conda run -n raconteur --no-capture-output \
     python -m rr start $SNAPSHOTS_PATH \
         --alternation-list-path $DATASET_ROOT/index.txt \
-        --alternation-target $DATASET_ROOT/threads >> $LOG_FILE 2>&1
+        --alternation-target $DATASET_ROOT/threads 1>> $LOG_FILE 2>&1

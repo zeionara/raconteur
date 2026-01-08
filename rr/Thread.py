@@ -15,7 +15,7 @@ class File:
 
     @property
     def link(self):
-        return f'https://2ch.org/{self.path}'
+        return f'https://2ch.org{self.path}'
 
 
 class Thread:

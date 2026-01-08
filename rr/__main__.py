@@ -42,7 +42,7 @@ from .Chatterbox import Chatterbox
 
 from .RaconteurFactory import RaconteurFactory
 
-from .util import one_is_not_none, read, is_audio, is_image, is_video, post_process_summary, truncate_translation  # , drop_accent_marks, drop_empty_lines
+from .util import one_is_not_none, read, is_audio, is_image, is_video, post_process_summary, truncate_translation, fetch_file_async  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
 from .HuggingFaceClient import HuggingFaceClient, Task
 
@@ -272,6 +272,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
         try:
             if len(files) > 0 and len(message_text) <= 1024:
                 file = files[0].link
+                print(f'Sending file {file}')
+                # fetched_file = await fetch_file_async(file)
                 try:
                     n_attempts = 10
 
@@ -279,8 +281,10 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                         try:
                             if is_image(file):
                                 message = await user.send_photo(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                                # message = await user.send_photo(fetched_file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
                             elif is_video(file):
                                 message = await user.send_video(file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
+                                # message = await user.send_video(fetched_file, caption = message_text, reply_markup = buttons, parse_mode = 'Markdown')
                             else:
                                 message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
                             break
@@ -294,7 +298,8 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                     message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
             else:
                 message = await user.send_message(cut_message(message_text), reply_markup = buttons, parse_mode = 'Markdown')
-        except:
+        except Exception as e:
+            print(f'Thread {thread.link} is not supported due to exception:', e)
             message = await user.send_message(
                 f'Thread {thread.link} is not supported\n\n{thread.links}\n\n**Length: {thread.length}**\n**Freshness: {100 * thread.freshness:.2f}%**',
                 reply_markup = buttons,
@@ -560,11 +565,20 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                     await user.send_message(f'There was an internal error:\n\n```{format_exc()}```\nPlease try again', parse_mode = 'Markdown')
                     return
 
-            with open(audio_path, 'rb') as audio_file:
-                try:
-                    await user.send_audio(audio_file, title = thread_title)
-                except NetworkError:
-                    await user.send_message(f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again", parse_mode = 'Markdown')
+            n_attempts = 10
+
+            while True:
+                with open(audio_path, 'rb') as audio_file:
+                    try:
+                        await user.send_audio(audio_file, title = thread_title)
+                    except NetworkError:
+                        if n_attempts > 0:
+                            n_attempts -= 1
+                        else:
+                            await user.send_message(
+                                f"Can't send file `{audio_path}` due to a network error:\n\n```{format_exc()[:4096 - 67 - len(audio_path)]}```\nPlease try again",
+                                parse_mode = 'Markdown'
+                            )
 
             # print(time() - last_auth_timestamp)
 
