@@ -571,6 +571,7 @@ def start(assets: str, cloud: str, alternation_list_path: str, alternation_targe
                 with open(audio_path, 'rb') as audio_file:
                     try:
                         await user.send_audio(audio_file, title = thread_title)
+                        break
                     except NetworkError:
                         if n_attempts > 0:
                             n_attempts -= 1
