@@ -4,20 +4,34 @@ An auxiliary tool for simplifying speech generation on arbitrary texts
 
 ## Set up enrivonment
 
-Requires at least `7Gb` of disk space. To install the latest package versions use the following command:
+Requires at least `7Gb` of disk space. After cloning the repo initialize the submodules:
 
 ```sh
-conda create -n raconteur -y
-conda activate raconteur
-pip install scipy ipython pydub audioop-lts music-tag tqdm num2words requests torch transliterate transformers click pandas python-telegram-bot[job-queue] beautifulsoup4 omegaconf sentencepiece flask google-images-search
+cd raconteur && git submodule update --init
 ```
 
-For sticking with the latest tested versions:
+Then create a new virtual environment (the package requires `Python 3.11.14`):
 
 ```sh
-conda create -n raconteur python=3.13 -y
-conda activate raconteur
-pip install audioop-lts==0.2.2 beautifulsoup4==4.13.5 click==8.2.1 ipython==9.5.0 music-tag==0.4.3 num2words==0.5.14 omegaconf==2.3.0 pandas==2.3.2 pydub==0.25.1 'python-telegram-bot[job-queue]==22.3' requests==2.32.5 scipy==1.16.1 torch==2.8.0 tqdm==4.67.1 transformers==4.56.0 transliterate==1.10.2 sentencepiece==0.2.1 flask==3.1.2 google-images-search==1.4.7
+python -m venv .venv
+```
+
+Activate the environment and install dependencies:
+
+```sh
+source .venv/bin/activate
+```
+
+Install dependencies by running the following command:
+
+```sh
+pip install chatterbox-tts kokoro ipython music-tag num2words transliterate 'python-telegram-bot[job-queue]' peft sentencepiece aiohttp beautifulsoup4
+```
+
+Or using provided `requirements.txt`:
+
+```sh
+pip install -r requirements.txt
 ```
 
 ## Usage
