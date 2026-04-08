@@ -41,6 +41,7 @@ from .Kokoro import Kokoro
 from .Chatterbox import Chatterbox
 
 from .RaconteurFactory import RaconteurFactory
+from .GenerationException import GenerationException
 
 from .util import one_is_not_none, read, is_audio, is_image, is_video, post_process_summary, truncate_translation, fetch_file_async  # , drop_accent_marks, drop_empty_lines
 from .SpeechIndex import SpeechIndex
@@ -1007,10 +1008,14 @@ def handle_aneks(
 
             # try:
 
-            speaker.speak(
-                text = text,
-                filename = filename
-            )
+            try:
+                speaker.speak(
+                    text = text,
+                    filename = filename
+                )
+            except GenerationException as e:
+                print(f'Failed generation due to exception: {e}')
+                break
 
             print('Handled', filename)
 
@@ -1022,7 +1027,7 @@ def handle_aneks(
             #         filename = filename
             #     )
 
-        n_aneks += 1
+            n_aneks += 1
 
         # print(f'Handled {n_aneks} aneks')
 

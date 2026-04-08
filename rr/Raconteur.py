@@ -11,6 +11,7 @@ from music_tag import load_file
 from tqdm import tqdm
 
 from .Splitter import Splitter
+from .GenerationException import GenerationException
 from .util import drop_empty_lines  # , drop_accent_marks
 
 
@@ -113,7 +114,7 @@ class Raconteur(ABC):
                 try:
                     predictions = self.predict(chunk)
                 # except ValueError:
-                except (OSError, KeyboardInterrupt):
+                except (OSError, KeyboardInterrupt, GenerationException):
                     raise
                 except:
                     print(format_exc())

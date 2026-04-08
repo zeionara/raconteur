@@ -7,6 +7,7 @@ from scipy.io.wavfile import read as read_wav
 from numpy import float32
 
 from .Raconteur import Raconteur
+from .GenerationException import GenerationException
 
 
 OAUTH_URL = 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'
@@ -14,12 +15,16 @@ TTS_URL = 'https://smartspeech.sber.ru/rest/v1/text:synthesize'
 
 TIMEOUT = 100
 
+HTTP_200_OK = 200
+
 
 class SaluteSpeech(Raconteur):
     name = 'salute'
 
     # def __init__(self, client_id: str, client_secret: str, auth: str, artist = 'Nec', *args, **kwargs):
-    def __init__(self, auth: str, artist = 'Nec', *args, **kwargs):
+    def __init__(self, auth: str, artist = None, *args, **kwargs):
+        if artist is None:
+            artist = 'Nec'
         # self.client_id = client_id
         # self.client_secret = client_secret
         self.auth = auth
@@ -48,6 +53,9 @@ class SaluteSpeech(Raconteur):
             verify = False,
             timeout = TIMEOUT
         )
+
+        if response.status_code != HTTP_200_OK:
+            raise GenerationException(f'Unexpected response status: {response.status_code} ({response.content})')
 
         _, data = read_wav(BytesIO(response.content))
 
