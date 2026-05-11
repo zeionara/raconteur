@@ -4,21 +4,108 @@ An auxiliary tool for simplifying speech generation on arbitrary texts
 
 ## Set up enrivonment
 
-Requires at least `7Gb` of disk space. After cloning the repo initialize the submodules:
+Requires at least `7Gb` of disk space. First, clone the [marude][madure] repo:
 
 ```sh
-cd raconteur && git submodule update --init
+git clone git@github.com:zeionara/marude.git /tmp/marude && sudo mv /tmp/marude /opt/marude && sudo chown -R $USERNAME:$USERNAME /opt/marude
+```
+
+After cloning the repo initialize the submodules:
+
+```sh
+cd /opt/marude && git submodule update --init
+```
+
+Configure links to `marude` submodules at the `/opt`:
+
+```sh
+for folder in /opt/marude/submodules/*; do submodule=$(echo $folder | rev | cut -d '/' -f 1 | rev); sudo ln -s /opt/marude/submodules/$submodule /opt/$submodule; cd /opt/$submodule; git pull origin master; git checkout master; done
 ```
 
 Then create a new virtual environment (the package requires `Python 3.11.14`):
 
 ```sh
-python -m venv .venv
+# Install python3.11 on gentoo
+sudo emerge --ask dev-lang/python:3.11
+eselect python list
+eselect python set 2
+# Install python3.11 on ubuntu
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt-get update
+sudo apt-get install python3.11
+sudo apt-get install python3.11-venv
+# Create virtual environment
+python3.11 -m venv /opt/marude/.venv
 ```
 
-Activate the environment and install dependencies:
+Activate the environment using this command:
 
 ```sh
+source /opt/marude/.venv/bin/activate
+```
+
+## Set up raconteur-only repo
+
+Requires at least `7Gb` of disk space. First, clone the repo:
+
+```sh
+git clone git@github.com:zeionara/raconteur.git /tmp/raconteur && sudo mv /tmp/raconteur /opt && sudo chown -R $USERNAME:$USERNAME /opt/raconteur
+```
+
+After cloning the repo initialize the submodules:
+
+```sh
+cd /opt/raconteur && git submodule update --init
+```
+
+Then create a new virtual environment (the package requires `Python 3.11.14`):
+
+```sh
+# Install python3.11 on gentoo
+sudo emerge --ask dev-lang/python:3.11
+eselect python list
+eselect python set 2
+# Install python3.11 on ubuntu
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt-get update
+sudo apt-get install python3.11
+sudo apt-get install python3.11-venv
+# Create virtual environment
+python3.11 -m venv .venv
+```
+
+For convenience, create link to `/opt/raconteur/submodules/much` at the `/opt/much`:
+
+```sh
+sudo ln -s /opt/raconteur/submodules/much /opt/much
+```
+
+Checkout the latest version of `much` package:
+
+```sh
+cd /opt/much
+git pull origin master
+git checkout master
+```
+
+Likewise, create link to `/opt/raconteur/submodules/karma` at the `/opt/karma`:
+
+```sh
+sudo ln -s /opt/raconteur/submodules/karma /opt/karma
+```
+
+Checkout the latest version of `karma` package:
+
+```sh
+cd /opt/karma
+git pull origin master
+git checkout master
+```
+
+Go back to `/opt/raconteur` and activate the environment:
+
+```sh
+cd /opt/raconteur
 source .venv/bin/activate
 ```
 
@@ -34,43 +121,55 @@ Or using provided `requirements.txt`:
 pip install -r requirements.txt
 ```
 
-## Usage
+## Set up patch dataset
+
+Go to the `/opt/much/assets` folder:
+
+```sh
+cd /opt/much/assets
+```
+
+Clone [patch][patch] dataset there:
+
+```sh
+git clone git@hf.co:datasets/zeio/patch
+```
+
+Install `git lfs`:
+
+```sh
+cd /opt/much/assets/patch
+# Install git lfs on gentoo
+sudo emerge --ask dev-vcs/git-lfs
+# Install git lfs on ubuntu
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+sudo apt-get install git-lfs
+```
+
+To enable `git lfs` for `patch` repo:
+
+```sh
+git lfs install
+```
+
+Pull `lfs` files:
+
+```sh
+git lfs pull
+```
+
+On how to update [patch][patch] dataset see [this guide](https://github.com/zeionara/much#pulling-all-active-threads-from-the-2ch-website-to-update-patch-dataset).
+
+## Use
 
 ### Update baneks datasets
 
 #### Update text dataset
 
-1. Pull the marude [repo][marude]:
+Clone the [marude][marude] repo:
 
 ```sh
-# 1. Setup marude
-git clone git@github.com:zeionara/marude.git /tmp/marude
-sudo mv /tmp/marude /opt/marude
-sudo chown -R zeio:zeio /opt/marude
-# 2. Setup fuck
-git clone git@github.com:zeionara/fuck.git /tmp/fuck
-sudo mv /tmp/fuck /opt/fuck
-sudo chown -R zeio:zeio /opt/fuck
-rmdir /opt/marude/submodules/fuck
-ln -s /opt/fuck /opt/marude/submodules/fuck
-# 3. Setup karma
-git clone git@github.com:zeionara/karma.git /tmp/karma
-sudo mv /tmp/karma /opt/karma
-sudo chown -R zeio:zeio /opt/karma
-rmdir /opt/marude/submodules/karma
-ln -s /opt/karma /opt/marude/submodules/karma
-# 4. Setup much
-git clone git@github.com:zeionara/much.git /tmp/much
-sudo mv /tmp/much /opt/much
-sudo chown -R zeio:zeio /opt/much
-rmdir /opt/marude/submodules/much
-ln -s /opt/much /opt/marude/submodules/much
-# 5. Setup raconteur
-git clone git@github.com:zeionara/raconteur.git /tmp/raconteur
-sudo mv /tmp/raconteur /opt/raconteur
-sudo chown -R zeio:zeio /opt/raconteur
-rmdir /opt/marude/submodules/raconteur
-ln -s /opt/raconteur /opt/marude/submodules/raconteur
+git clone git@github.com:zeionara/marude.git /tmp/marude && sudo mv /tmp/marude /opt/marude && sudo chown -R $USERNAME:$USERNAME /opt/marude
 ```
 
 2. Create and activate environment:
@@ -283,4 +382,6 @@ python -m unittest discover test
 [baneks-speech]: https://huggingface.co/datasets/zeio/baneks-speech
 [raconteur]: https://github.com/zeionara/raconteur
 [marude]: https://github.com/zeionara/marude
+[fuck]: https://github.com/zeionara/fuck
 [baneks]: https://huggingface.co/datasets/zeio/baneks
+[patch]: https://huggingface.co/datasets/zeio/patch
