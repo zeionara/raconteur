@@ -1,8 +1,9 @@
 from enum import Enum
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from requests import post
+from requests.exceptions import ConnectTimeout
 import numpy as np
 from scipy.io.wavfile import read as read_wav
 from numpy import float32
@@ -13,8 +14,10 @@ from .GenerationException import GenerationException
 
 OAUTH_URL = 'https://mcs.mail.ru/auth/oauth/v1/token'
 TTS_URL = 'https://voice.mcs.mail.ru/tts'
+EXPIRATION_GAP = 10
+N_ATTEMPTS = 5
 
-TIMEOUT = 100
+TIMEOUT = 120  # seconds
 
 HTTP_200_OK = 200
 
@@ -44,7 +47,7 @@ class VKCloud(Raconteur):
         if tempo is None:
             tempo = 1.0
 
-        assert 0.75 < tempo < 1.75
+        assert 0.75 <= tempo <= 1.75
 
         self.client_id = client_id
         self.client_secret = client_secret
@@ -78,7 +81,9 @@ class VKCloud(Raconteur):
 
             self.refresh_token = response_json['refresh_token']
             self.access_token = response_json['access_token']
-            self.access_token_expires = response_json['expired_in']
+            self.access_token_expires = datetime.now() + timedelta(seconds = int(response_json['expired_in']) - EXPIRATION_GAP)
+
+            print('Current refresh token:', self.refresh_token)
 
             return
 
@@ -99,27 +104,41 @@ class VKCloud(Raconteur):
 
         self.refresh_token = response_json['refresh_token']
         self.access_token = response_json['access_token']
-        self.access_token_expires = response_json['expired_in']
+        self.access_token_expires = datetime.now() + timedelta(seconds = int(response_json['expired_in']) - EXPIRATION_GAP)
+
+        print('Current refresh token:', self.refresh_token)
 
     def predict(self, text: str):
         if self.access_token is None or datetime.now() > self.access_token_expires:
             self._refresh_access_token()
 
-        response = post(
-            TTS_URL,
-            data = text.encode('utf-8'),
-            params = {
-                'model_name': self.model.value,
-                'encoder': self.encoder.value,
-                'tempo': self.tempo
-            },
-            headers = {
-                'Authorization': f'Bearer {self.access_token}',
-                'Content-Type': 'application/text'
-            },
-            # verify = False,
-            timeout = TIMEOUT
-        )
+        n_attempts = N_ATTEMPTS
+
+        while True:
+            try:
+                response = post(
+                    TTS_URL,
+                    data = text.encode('utf-8'),
+                    params = {
+                        'model_name': self.model.value,
+                        'encoder': self.encoder.value,
+                        'tempo': self.tempo
+                    },
+                    headers = {
+                        'Authorization': f'Bearer {self.access_token}',
+                        'Content-Type': 'application/text'
+                    },
+                    # verify = False,
+                    timeout = TIMEOUT
+                )
+            except ConnectTimeout:
+                if n_attempts > 0:
+                    n_attempts -= 1
+                    continue
+
+                raise GenerationException(f'Failed {N_ATTEMPTS} generation attempts')
+
+            break
 
         if response.status_code != HTTP_200_OK:
             raise GenerationException(f'Unexpected response status: {response.status_code} ({response.content})')

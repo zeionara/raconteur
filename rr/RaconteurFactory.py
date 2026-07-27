@@ -25,7 +25,7 @@ class RaconteurFactory:
                     client_id = env['VK_CLOUD_CLIENT_ID'],
                     client_secret = env['VK_CLOUD_CLIENT_SECRET'],
                     model = VKCloudModel.KATHERINE_HIFIGAN,
-                    tempo = 1.0,
+                    tempo = 0.9,
                     splitter = Splitter(10_000 if max_n_characters is None else max_n_characters)
                 )
             case SaluteSpeech.name:
