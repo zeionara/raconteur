@@ -34,6 +34,7 @@ from karma import CloudMail
 # from .Bark import Bark
 # from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
+from .VKCloud import VKCloud
 from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
@@ -54,7 +55,7 @@ filterwarnings(action = 'ignore', message = r'.*CallbackQueryHandler', category 
 
 
 # ENGINES = Choice((Bark.name, RuTTS.name, SaluteSpeech.name, Crt.name, Coqui.name, Silero.name), case_sensitive = False)
-ENGINES = Choice((SaluteSpeech.name, Crt.name, Silero.name, Kokoro.name, Chatterbox.name), case_sensitive = False)
+ENGINES = Choice((SaluteSpeech.name, VKCloud.name, Crt.name, Silero.name, Kokoro.name, Chatterbox.name), case_sensitive = False)
 OVERLAY = (
     'ffmpeg -y -i {input} -i {background} '
     '-filter_complex "[1:a]atrim=start={offset},asetpts=PTS-STARTPTS,volume={volume}[v1];[0:a][v1]amix=inputs=2:duration=shortest" '

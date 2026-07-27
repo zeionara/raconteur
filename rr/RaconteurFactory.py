@@ -5,6 +5,7 @@ from .Splitter import Splitter
 # from .Bark import Bark
 # from .RuTTS import RuTTS
 from .SaluteSpeech import SaluteSpeech
+from .VKCloud import VKCloud, Model as VKCloudModel
 from .Crt import Crt
 # from .Coqui import Coqui
 from .Silero import Silero
@@ -19,6 +20,14 @@ class RaconteurFactory:
 
     def make(self, engine: str, max_n_characters: int = None, artist: str = None, reference: str = None, ssml: bool = False):
         match engine:
+            case VKCloud.name:
+                return VKCloud(
+                    client_id = env['VK_CLOUD_CLIENT_ID'],
+                    client_secret = env['VK_CLOUD_CLIENT_SECRET'],
+                    model = VKCloudModel.KATHERINE_HIFIGAN,
+                    tempo = 1.0,
+                    splitter = Splitter(10_000 if max_n_characters is None else max_n_characters)
+                )
             case SaluteSpeech.name:
                 return SaluteSpeech(
                     # client_id = env['SALUTE_SPEECH_CLIENT_ID'],
