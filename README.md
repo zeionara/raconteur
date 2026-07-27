@@ -44,6 +44,18 @@ Activate the environment using this command:
 source /opt/marude/.venv/bin/activate
 ```
 
+Enable alternation `crontab`:
+
+```sh
+0 * * * * timeout 60m /bin/bash /opt/much/alternate.sh
+```
+
+Enable telegram bot `crontab`:
+
+```sh
+@reboot /bin/bash /opt/raconteur/start.sh
+```
+
 ## Set up raconteur-only repo
 
 Requires at least `7Gb` of disk space. First, clone the repo:
@@ -112,6 +124,7 @@ source .venv/bin/activate
 Install dependencies by running the following command:
 
 ```sh
+sudo emerge --ask media-libs/taglib  # required by taglib
 pip install chatterbox-tts kokoro ipython music-tag num2words transliterate 'python-telegram-bot[job-queue]' peft sentencepiece aiohttp beautifulsoup4
 ```
 

@@ -1009,7 +1009,7 @@ def handle_aneks(
             # try:
 
             try:
-                speaker.speak(
+                speaker.speak(  # TODO: handle requests.exception.ConnectionTimeout
                     text = text,
                     filename = filename
                 )

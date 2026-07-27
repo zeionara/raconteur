@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/opt/raconteur
-CONDA_ROOT=/opt/conda
+VENV_ROOT=/opt/marude/.venv
 
 DATASET_ROOT=$PROJECT_ROOT/assets/auch
 
@@ -27,8 +27,7 @@ if test ! -d $LOG_ROOT; then
   mkdir $LOG_ROOT
 fi
 
-. "$CONDA_ROOT/etc/profile.d/conda.sh"
-. /home/zeio/bashrc/creds/personal.sh
+. /home/zeio/.oh-my-zsh/custom/bashrc/creds/personal.sh
 
 if test -f $LOG_FILE; then
   echo >> $LOG_FILE
@@ -38,7 +37,6 @@ date +"%Y-%m-%d %H:%M:%S" >> $LOG_FILE
 
 cd $PROJECT_ROOT
 
-conda run -n raconteur --no-capture-output \
-    python -m rr start $SNAPSHOTS_PATH \
-        --alternation-list-path $DATASET_ROOT/index.txt \
-        --alternation-target $DATASET_ROOT/threads 1>> $LOG_FILE 2>&1
+$VENV_ROOT/bin/python -m rr start $SNAPSHOTS_PATH \
+    --alternation-list-path $DATASET_ROOT/index.txt \
+    --alternation-target $DATASET_ROOT/threads 1>> $LOG_FILE 2>&1

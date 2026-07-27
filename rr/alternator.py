@@ -12,7 +12,7 @@ def _alternate(text: str, artist_one: str, artist_two: str, output_path: str = N
     if output_path is None:
         output_path = f'{path.splitext(text)[0]}.mp3'
 
-    factory = RaconteurFactory(gpu = True, ru = True)
+    factory = RaconteurFactory(gpu = False, ru = True)
 
     a1 = factory.make(engine = 'silero', artist = artist_one)
     a2 = factory.make(engine = 'silero', artist = artist_two)
