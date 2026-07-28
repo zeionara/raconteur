@@ -40,7 +40,7 @@ class Encoder(Enum):
 class VKCloud(Raconteur):
     name = 'vk'
 
-    def __init__(self, client_id: str, client_secret: str, model: Model | None = None, tempo: float | None = None, *args, **kwargs):
+    def __init__(self, client_id: str, client_secret: str, refresh_token: str | None = None, model: Model | None = None, tempo: float | None = None, *args, **kwargs):
         if model is None:
             model = Model.KATHERINE_HIFIGAN
 
@@ -52,7 +52,7 @@ class VKCloud(Raconteur):
         self.client_id = client_id
         self.client_secret = client_secret
 
-        self.refresh_token = None
+        self.refresh_token = refresh_token
         self.access_token = None
         self.access_token_expires = None
 
@@ -64,28 +64,30 @@ class VKCloud(Raconteur):
 
     def _refresh_access_token(self):
         if self.refresh_token is None:
-            response = post(
-                OAUTH_URL,
-                json = {
-                    'client_id': self.client_id,
-                    'client_secret': self.client_secret,
-                    'grant_type': 'client_credentials'
-                },
-                timeout = TIMEOUT
-            )
+            raise ValueError('Missing refresh token')
 
-            if response.status_code != HTTP_200_OK:
-                raise GenerationException(f'Unexpected get token response status: {response.status_code} ({response.content})')
+            # response = post(
+            #     OAUTH_URL,
+            #     json = {
+            #         'client_id': self.client_id,
+            #         'client_secret': self.client_secret,
+            #         'grant_type': 'client_credentials'
+            #     },
+            #     timeout = TIMEOUT
+            # )
 
-            response_json = response.json()
+            # if response.status_code != HTTP_200_OK:
+            #     raise GenerationException(f'Unexpected get token response status: {response.status_code} ({response.content})')
 
-            self.refresh_token = response_json['refresh_token']
-            self.access_token = response_json['access_token']
-            self.access_token_expires = datetime.now() + timedelta(seconds = int(response_json['expired_in']) - EXPIRATION_GAP)
+            # response_json = response.json()
 
-            print('Current refresh token:', self.refresh_token)
+            # self.refresh_token = response_json['refresh_token']
+            # self.access_token = response_json['access_token']
+            # self.access_token_expires = datetime.now() + timedelta(seconds = int(response_json['expired_in']) - EXPIRATION_GAP)
 
-            return
+            # print('Current refresh token:', self.refresh_token)
+
+            # return
 
         response = post(
             OAUTH_URL,
@@ -106,7 +108,7 @@ class VKCloud(Raconteur):
         self.access_token = response_json['access_token']
         self.access_token_expires = datetime.now() + timedelta(seconds = int(response_json['expired_in']) - EXPIRATION_GAP)
 
-        print('Current refresh token:', self.refresh_token)
+        # print('Current refresh token:', self.refresh_token)
 
     def predict(self, text: str):
         if self.access_token is None or datetime.now() > self.access_token_expires:

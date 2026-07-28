@@ -1033,7 +1033,11 @@ def handle_aneks(
         # print(f'Handled {n_aneks} aneks')
 
     elapsed = time() - start
-    print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+
+    if n_aneks > 0:
+        print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds ({elapsed / n_aneks:.5f} seconds per anek in average)')
+    else:
+        print(f'Handled {n_aneks} aneks in {elapsed:.5f} seconds')
 
 
 @main.command()

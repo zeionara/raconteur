@@ -1,4 +1,4 @@
-from os import environ as env
+from os import environ as env, path as os_path
 
 from .Splitter import Splitter
 
@@ -13,6 +13,9 @@ from .Kokoro import Kokoro
 from .Chatterbox import Chatterbox
 
 
+VK_CLOUD_REFRESH_TOKEN_PATH = '.vk-cloud-refresh-token'
+
+
 class RaconteurFactory:
     def __init__(self, gpu: bool = False, ru: bool = False):
         self.gpu = gpu
@@ -21,9 +24,16 @@ class RaconteurFactory:
     def make(self, engine: str, max_n_characters: int = None, artist: str = None, reference: str = None, ssml: bool = False):
         match engine:
             case VKCloud.name:
+                if os_path.isfile(VK_CLOUD_REFRESH_TOKEN_PATH):
+                    with open(VK_CLOUD_REFRESH_TOKEN_PATH, 'r', encoding = 'utf-8') as file:
+                        refresh_token = file.read()
+                else:
+                    refresh_token = None
+
                 return VKCloud(
                     client_id = env['VK_CLOUD_CLIENT_ID'],
                     client_secret = env['VK_CLOUD_CLIENT_SECRET'],
+                    refresh_token = refresh_token,
                     model = VKCloudModel.KATHERINE_HIFIGAN,
                     tempo = 0.9,
                     splitter = Splitter(10_000 if max_n_characters is None else max_n_characters)
